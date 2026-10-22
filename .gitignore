@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.venv/
+.venv*/
+venv/
+env/
+ENV/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating System
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Project Data & Privacy (Sensitive student biometric info & photos)
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+database/encodings.pkl
+database/models/*.onnx
+!database/.gitkeep
+
+student_photos/*
+!student_photos/.gitkeep
+
+attendance_records/*
+!attendance_records/.gitkeep
+
+reports/*
+!reports/.gitkeep
+
+# Secrets / Config
+.env
+.env.*

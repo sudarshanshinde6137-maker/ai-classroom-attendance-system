@@ -1,0 +1,10 @@
+opencv-contrib-python
+numpy
+pandas
+Pillow
+reportlab
+openpyxl
+customtkinter
+matplotlib
+pyttsx3
+mediapipe
