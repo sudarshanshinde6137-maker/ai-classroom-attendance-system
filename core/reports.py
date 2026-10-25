@@ -177,8 +177,6 @@ def export_pdf(records: List[Dict], date: str, summary: Dict) -> str:
     return filepath
 
 
-# ── CSV Export ────────────────────────────────────────────────────────────────
-
 def export_csv(records: List[Dict], date: str) -> str:
     """Export as CSV."""
     import pandas as pd
@@ -187,4 +185,164 @@ def export_csv(records: List[Dict], date: str) -> str:
     filepath = os.path.join(REPORTS_DIR, filename)
     df = pd.DataFrame(records)
     df.to_csv(filepath, index=False)
+    return filepath
+
+
+# ── Defaulter List Export ─────────────────────────────────────────────────────
+
+def export_defaulters_report(defaulters: List[Dict], threshold: float = 75.0, format: str = "excel") -> str:
+    """Export Defaulter Students (< 75%) to Excel or PDF."""
+    _ensure_dir()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if format == "excel":
+        import pandas as pd
+        filename = f"Defaulters_Alert_{timestamp}.xlsx"
+        filepath = os.path.join(REPORTS_DIR, filename)
+
+        export_data = []
+        for idx, s in enumerate(defaulters, 1):
+            export_data.append({
+                "#": idx,
+                "Name": s.get("name", ""),
+                "Roll No": s.get("roll_no", ""),
+                "PRN": s.get("prn", ""),
+                "Lectures Attended": s.get("attended", 0),
+                "Total Lectures Held": s.get("total_held", 0),
+                "Absent Count": s.get("absent", 0),
+                "Attendance %": f"{s.get('percentage', 0.0):.1f}%",
+                "Status": "CRITICAL DEFAULTER" if s.get("percentage", 0) < 60 else "DEFAULTER WARNING"
+            })
+
+        df = pd.DataFrame(export_data)
+        with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Defaulters", index=False)
+            ws = writer.sheets["Defaulters"]
+            for col in ws.columns:
+                max_len = max(len(str(cell.value or "")) for cell in col) + 4
+                ws.column_dimensions[col[0].column_letter].width = min(max_len, 35)
+
+        return filepath
+
+    # PDF Export
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+                                     Paragraph, Spacer, HRFlowable)
+
+    filename = f"Defaulters_Alert_{timestamp}.pdf"
+    filepath = os.path.join(REPORTS_DIR, filename)
+
+    doc = SimpleDocTemplate(filepath, pagesize=A4,
+                             topMargin=1.8*cm, bottomMargin=1.8*cm,
+                             leftMargin=1.8*cm, rightMargin=1.8*cm)
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("DefTitle", parent=styles["Title"],
+                                  fontSize=17, spaceAfter=4,
+                                  textColor=colors.HexColor("#b71c1c"))
+    sub_style = ParagraphStyle("DefSub", parent=styles["Normal"],
+                                fontSize=10, textColor=colors.grey, spaceAfter=8)
+    alert_box_style = ParagraphStyle("AlertBox", parent=styles["Normal"],
+                                     fontSize=11, fontName="Helvetica-Bold",
+                                     textColor=colors.HexColor("#b71c1c"))
+
+    elements = []
+    elements.append(Paragraph("⚠️ Official Defaulter Attendance Notice", title_style))
+    elements.append(Paragraph(
+        f"Generated: {datetime.now().strftime('%d %b %Y, %I:%M %p')}  |  Criteria: Attendance strictly below {threshold:.0f}%",
+        sub_style
+    ))
+    elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#b71c1c")))
+    elements.append(Spacer(1, 0.4*cm))
+
+    # Alert summary banner
+    summary_msg = f"<b>ACTION REQUIRED:</b> {len(defaulters)} student(s) identified with attendance under {threshold:.0f}%. Students must meet faculty mentor."
+    elements.append(Paragraph(summary_msg, alert_box_style))
+    elements.append(Spacer(1, 0.4*cm))
+
+    table_data = [["#", "Student Name", "Roll No", "PRN", "Attended", "Held", "Attendance %"]]
+    for idx, d in enumerate(defaulters, 1):
+        table_data.append([
+            str(idx),
+            d.get("name", ""),
+            d.get("roll_no", ""),
+            d.get("prn", ""),
+            str(d.get("attended", 0)),
+            str(d.get("total_held", 0)),
+            f"{d.get('percentage', 0.0):.1f}%"
+        ])
+
+    col_widths = [1*cm, 4.5*cm, 3.0*cm, 3.2*cm, 2.0*cm, 1.8*cm, 2.5*cm]
+    t = Table(table_data, colWidths=col_widths)
+
+    row_styles = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#b71c1c")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#ef9a9a")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]
+
+    for r_idx in range(1, len(table_data)):
+        bg = colors.HexColor("#ffebee") if r_idx % 2 == 1 else colors.white
+        row_styles.append(("BACKGROUND", (0, r_idx), (-1, r_idx), bg))
+        row_styles.append(("TEXTCOLOR", (-1, r_idx), (-1, r_idx), colors.HexColor("#b71c1c")))
+        row_styles.append(("FONTNAME", (-1, r_idx), (-1, r_idx), "Helvetica-Bold"))
+
+    t.setStyle(TableStyle(row_styles))
+    elements.append(t)
+
+    doc.build(elements)
+    return filepath
+
+
+# ── Monthly Register Matrix Export ───────────────────────────────────────────
+
+def export_monthly_matrix(matrix: Dict, format: str = "excel") -> str:
+    """Export monthly register grid sheet (Students vs Days 1..31) to Excel."""
+    import pandas as pd
+    _ensure_dir()
+
+    year = matrix.get("year", datetime.now().year)
+    month = matrix.get("month", datetime.now().month)
+    subject = matrix.get("subject", "All")
+    held_days = matrix.get("held_days", [])
+    rows = matrix.get("rows", [])
+
+    filename = f"Register_Matrix_{year}_{month:02d}_{subject.replace(' ', '_')}.xlsx"
+    filepath = os.path.join(REPORTS_DIR, filename)
+
+    excel_rows = []
+    for r in rows:
+        row_dict = {
+            "Roll No": r.get("roll_no", ""),
+            "Student Name": r.get("name", ""),
+            "PRN": r.get("prn", "")
+        }
+        # Add columns for each day of classes
+        for day in held_days:
+            col_name = f"Day {day:02d}"
+            row_dict[col_name] = r["days"].get(day, "-")
+
+        row_dict["Total Attended"] = r.get("attended", 0)
+        row_dict["Total Held"] = r.get("total_held", 0)
+        row_dict["Monthly %"] = f"{r.get('percentage', 0.0):.1f}%"
+        excel_rows.append(row_dict)
+
+    df = pd.DataFrame(excel_rows)
+
+    with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name=f"{year}_{month:02d}", index=False)
+        ws = writer.sheets[f"{year}_{month:02d}"]
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or "")) for cell in col) + 3
+            ws.column_dimensions[col[0].column_letter].width = min(max_len, 28)
+
     return filepath

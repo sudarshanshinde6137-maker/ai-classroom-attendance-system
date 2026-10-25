@@ -20,7 +20,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.database import DatabaseManager
 from core.face_engine import FaceEngine
-from core.reports import export_excel, export_pdf, export_csv
+from core.reports import (export_excel, export_pdf, export_csv,
+                          export_defaulters_report, export_monthly_matrix)
+from core.notifications import generate_absentee_messages
 from core.auth import AuthManager
 
 # Matplotlib for Dashboard
@@ -209,6 +211,14 @@ class AttendanceApp:
             font=self.small, corner_radius=8,
             command=self._logout
         ).pack(side="right", padx=(6, 0), pady=18)
+
+        # Web Studio button
+        ctk.CTkButton(
+            right_block, text="🌐 Web Studio", width=108, height=30,
+            fg_color=ACCENT_DARK, hover_color="#7C3AED",
+            font=self.small, corner_radius=8,
+            command=self._launch_web_studio
+        ).pack(side="right", padx=(6, 4), pady=18)
 
         # Logged-in user chip
         user_chip = ctk.CTkFrame(right_block, corner_radius=999, fg_color="#0F2E1A",
@@ -725,11 +735,14 @@ class AttendanceApp:
 
         action_bar = ctk.CTkFrame(f, fg_color="transparent")
         action_bar.pack(fill="x", padx=6, pady=(0, 10))
-        ctk.CTkButton(action_bar, text="📊 Export Excel", fg_color=ACCENT_DARK, hover_color="#123C4C", command=self._export_excel).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(action_bar, text="📄 Export PDF",   fg_color="#2563EB",  hover_color="#1D4ED8", command=self._export_pdf).pack(side="left", padx=8)
-        ctk.CTkButton(action_bar, text="📁 Export CSV",   fg_color=PANEL_ALT,  hover_color="#223149", command=self._export_csv).pack(side="left", padx=8)
-        ctk.CTkButton(action_bar, text="📧 Email Report", fg_color="#F59E0B",  hover_color="#D97706", command=self._email_records).pack(side="left", padx=8)
-        ctk.CTkButton(action_bar, text="🔄 Refresh",      fg_color="#0F4C5C",  hover_color="#0B9FBF", command=self._load_records).pack(side="right", padx=8)
+        ctk.CTkButton(action_bar, text="📊 Export Excel", fg_color=ACCENT_DARK, hover_color="#123C4C", command=self._export_excel).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(action_bar, text="📄 Export PDF",   fg_color="#2563EB",  hover_color="#1D4ED8", command=self._export_pdf).pack(side="left", padx=6)
+        ctk.CTkButton(action_bar, text="📁 Export CSV",   fg_color=PANEL_ALT,  hover_color="#223149", command=self._export_csv).pack(side="left", padx=6)
+        ctk.CTkButton(action_bar, text="⚠️ Defaulters (<75%)", fg_color=DANGER, hover_color="#B91C1C", command=self._export_defaulters).pack(side="left", padx=6)
+        ctk.CTkButton(action_bar, text="📅 Monthly Matrix", fg_color="#4F46E5", hover_color="#4338CA", command=self._export_monthly_matrix).pack(side="left", padx=6)
+        ctk.CTkButton(action_bar, text="📢 Notify Absentees", fg_color="#10B981", hover_color="#059669", command=self._notify_absentees_dialog).pack(side="left", padx=6)
+        ctk.CTkButton(action_bar, text="📧 Email",        fg_color="#F59E0B",  hover_color="#D97706", command=self._email_records).pack(side="left", padx=6)
+        ctk.CTkButton(action_bar, text="🔄 Refresh",      fg_color="#0F4C5C",  hover_color="#0B9FBF", command=self._load_records).pack(side="right", padx=6)
 
         # Search bar
         search_bar = ctk.CTkFrame(f, fg_color=PANEL_BG, corner_radius=12, border_width=1, border_color=BORDER)
@@ -825,6 +838,160 @@ class AttendanceApp:
         except Exception as e:
             messagebox.showerror("Email Error", f"Could not open email client:\n{e}")
 
+    def _notify_absentees_dialog(self):
+        """Popup window to view absent students and dispatch WhatsApp/SMS/Email notices."""
+        import webbrowser
+        today = datetime.now().strftime("%Y-%m-%d")
+        session = self.current_session.get()
+        subject = self.current_subject.get()
+
+        records = self.db.get_attendance_by_date(today, session=session, subject=subject)
+        absent_students = [r for r in records if r["status"] == "Absent"]
+
+        if not absent_students:
+            messagebox.showinfo("Attendance 100%", f"🎉 Outstanding! All students are present for {subject} ({session} session).")
+            return
+
+        notices = generate_absentee_messages(absent_students, date=today, subject=subject, session=session)
+
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title(f"📢 Notify Absentees — {len(notices)} Absent")
+        dialog.geometry("620x540")
+        dialog.configure(fg_color=PAGE_BG)
+        dialog.attributes("-topmost", True)
+
+        hdr = ctk.CTkFrame(dialog, fg_color="transparent")
+        hdr.pack(fill="x", padx=20, pady=(16, 8))
+        ctk.CTkLabel(hdr, text=f"📢 Absentee Parent Alerts ({len(notices)} students)", font=self.h2, text_color=ACCENT).pack(anchor="w")
+        ctk.CTkLabel(hdr, text=f"Session: {session} • Subject: {subject} • Date: {today}", font=self.small, text_color=TEXT_MUTED).pack(anchor="w")
+
+        scroll = ctk.CTkScrollableFrame(dialog, fg_color="transparent", scrollbar_button_color=BORDER, corner_radius=0)
+        scroll.pack(fill="both", expand=True, padx=16, pady=8)
+
+        for n in notices:
+            card = ctk.CTkFrame(scroll, fg_color=PANEL_BG, corner_radius=12, border_width=1, border_color=BORDER)
+            card.pack(fill="x", pady=6)
+
+            c_top = ctk.CTkFrame(card, fg_color="transparent")
+            c_top.pack(fill="x", padx=14, pady=(10, 4))
+            ctk.CTkLabel(c_top, text=f"{n['name']} (Roll: {n['roll_no']})", font=ctk.CTkFont(size=13, weight="bold"), text_color="white").pack(side="left")
+            ctk.CTkLabel(c_top, text="ABSENT", font=ctk.CTkFont(size=11, weight="bold"), text_color=DANGER).pack(side="right")
+
+            preview = ctk.CTkLabel(card, text=n["sms_text"], font=ctk.CTkFont(size=11), text_color=TEXT_MUTED, justify="left", wraplength=540)
+            preview.pack(anchor="w", padx=14, pady=2)
+
+            btn_row = ctk.CTkFrame(card, fg_color="transparent")
+            btn_row.pack(fill="x", padx=14, pady=(6, 10))
+
+            def _open_wa(url=n["whatsapp_url"]):
+                webbrowser.open(url)
+
+            def _copy(text=n["sms_text"]):
+                self.root.clipboard_clear()
+                self.root.clipboard_append(text)
+                self.footer_label.configure(text="Copied absentee notification message")
+                messagebox.showinfo("Copied", "SMS / WhatsApp message copied to clipboard!")
+
+            ctk.CTkButton(btn_row, text="💬 Send WhatsApp", width=130, height=28, fg_color="#25D366", hover_color="#128C7E", font=self.small, command=_open_wa).pack(side="left", padx=(0, 8))
+            ctk.CTkButton(btn_row, text="📋 Copy Message", width=120, height=28, fg_color=PANEL_ALT, hover_color="#223149", font=self.small, command=_copy).pack(side="left")
+
+    def _export_defaulters(self):
+        """Export Defaulter List (< 75%) to Excel."""
+        try:
+            defaulters = self.db.get_defaulters(threshold=75.0)
+            if not defaulters:
+                messagebox.showinfo("Defaulters Notice", "Great news! No students currently fall below the 75% attendance threshold.")
+                return
+            path = export_defaulters_report(defaulters, threshold=75.0, format="excel")
+            self.footer_label.configure(text=f"Exported Defaulters: {os.path.basename(path)}")
+            messagebox.showinfo("Defaulters Exported", f"Found {len(defaulters)} students below 75% attendance.\nSaved to:\n{path}")
+            try:
+                os.startfile(path)
+            except Exception:
+                pass
+        except Exception as e:
+            messagebox.showerror("Defaulters Export Error", str(e))
+
+    def _export_monthly_matrix(self):
+        """Export Monthly Register Grid (days 1..31 vs students) to Excel."""
+        try:
+            now = datetime.now()
+            matrix = self.db.get_monthly_matrix(year=now.year, month=now.month, subject=self.current_subject.get())
+            path = export_monthly_matrix(matrix)
+            self.footer_label.configure(text=f"Exported Monthly Matrix: {os.path.basename(path)}")
+            messagebox.showinfo("Monthly Matrix Exported", f"Saved monthly register matrix for {now.strftime('%B %Y')} to:\n{path}")
+            try:
+                os.startfile(path)
+            except Exception:
+                pass
+        except Exception as e:
+            messagebox.showerror("Matrix Export Error", str(e))
+
+    def _bulk_import_students(self):
+        """Prompt teacher to select CSV or Excel file for bulk student import."""
+        import pandas as pd
+        file_path = filedialog.askopenfilename(
+            title="Select Student Roster (CSV or Excel)",
+            filetypes=[("Excel / CSV", "*.csv *.xlsx *.xls")]
+        )
+        if not file_path:
+            return
+
+        try:
+            if file_path.lower().endswith(".csv"):
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path)
+
+            records = df.to_dict(orient="records")
+            res = self.db.bulk_import_students(records)
+            self._load_students()
+            self._load_dashboard()
+
+            msg = f"Bulk Import Complete!\n\n• Enrolled: {res['imported']}\n• Skipped (duplicates): {res['skipped']}"
+            if res["errors"]:
+                msg += f"\n• Errors ({len(res['errors'])}):\n  " + "\n  ".join(res["errors"][:5])
+            messagebox.showinfo("Bulk Import", msg)
+        except Exception as e:
+            messagebox.showerror("Import Error", f"Failed to import file:\n{e}")
+
+    def _launch_web_studio(self):
+        """Start FastAPI server in daemon thread if needed and open browser."""
+        import webbrowser
+        import urllib.request
+        import threading
+
+        def _task():
+            is_running = False
+            try:
+                with urllib.request.urlopen("http://127.0.0.1:8000/api/meta", timeout=1) as resp:
+                    if resp.status == 200:
+                        is_running = True
+            except Exception:
+                is_running = False
+
+            if not is_running:
+                try:
+                    import uvicorn
+                    from web.server import app as fastapi_app
+
+                    def _serve():
+                        config = uvicorn.Config(fastapi_app, host="127.0.0.1", port=8000, log_level="warning")
+                        server = uvicorn.Server(config)
+                        server.run()
+
+                    t = threading.Thread(target=_serve, daemon=True)
+                    t.start()
+                    import time
+                    time.sleep(1.2)
+                except Exception as e:
+                    print(f"[WebStudio] Server start error: {e}")
+
+            webbrowser.open("http://127.0.0.1:8000")
+            self.root.after(0, lambda: self.footer_label.configure(text="Opened Web Studio: http://localhost:8000"))
+
+        threading.Thread(target=_task, daemon=True).start()
+
     def _build_students(self, f):
         header = ctk.CTkFrame(f, fg_color=PANEL_BG, corner_radius=18, border_width=1, border_color=BORDER)
         header.pack(fill="x", padx=6, pady=(0, 16))
@@ -840,8 +1007,12 @@ class AttendanceApp:
         
         controls = ctk.CTkFrame(f, fg_color="transparent")
         controls.pack(fill="x", pady=10)
-        ctk.CTkButton(controls, text="Delete Selected", fg_color=DANGER, hover_color="#B91C1C", 
-                      command=self._delete_student).pack(side="left")
+        ctk.CTkButton(controls, text="🗑 Delete Selected", fg_color=DANGER, hover_color="#B91C1C", 
+                      command=self._delete_student).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(controls, text="📥 Bulk Import (CSV/Excel)", fg_color="#059669", hover_color="#047857",
+                      command=self._bulk_import_students).pack(side="left", padx=10)
+        ctk.CTkButton(controls, text="⚠️ Defaulter List (<75%)", fg_color=WARNING, hover_color="#D97706",
+                      command=self._export_defaulters).pack(side="left", padx=10)
 
     def _load_students(self):
         self.stu_tree.delete(*self.stu_tree.get_children())

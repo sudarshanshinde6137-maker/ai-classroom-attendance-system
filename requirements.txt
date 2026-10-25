@@ -8,3 +8,6 @@ customtkinter
 matplotlib
 pyttsx3
 mediapipe
+fastapi
+uvicorn
+python-multipart

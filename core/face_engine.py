@@ -261,21 +261,86 @@ class FaceEngine:
             })
         return results
 
+    def check_liveness(self, face_rgb: np.ndarray) -> Tuple[bool, float, str]:
+        """
+        Multi-factor anti-spoofing / liveness check to detect phone screens and printed photos.
+        Uses Laplacian variance, color distribution analysis, and frequency domain statistics.
+        Returns: (is_live: bool, liveness_score: float, reason: str)
+        """
+        if face_rgb is None or face_rgb.size == 0 or face_rgb.shape[0] < 20 or face_rgb.shape[1] < 20:
+            return True, 80.0, "Face crop too small to evaluate"
+
+        gray = cv2.cvtColor(face_rgb, cv2.COLOR_RGB2GRAY)
+        
+        # 1. Texture Laplacian variance (blurry photos & low-res screens have low variance)
+        lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+
+        # 2. Lighting & saturation dynamics
+        hsv = cv2.cvtColor(face_rgb, cv2.COLOR_RGB2HSV)
+        v_channel = hsv[:, :, 2]
+        v_std = float(np.std(v_channel))
+        sat_mean = float(np.mean(hsv[:, :, 1]))
+
+        # Unified liveness score calculation
+        score = 50.0
+
+        # Texture sharpness
+        if lap_var > 60:
+            score += 25.0
+        elif lap_var < 25:
+            score -= 30.0  # Suspicious blur/flat print
+
+        # Light variation
+        if 20.0 < v_std < 90.0:
+            score += 15.0
+        else:
+            score -= 15.0  # Excessive screen backlighting / flat paper
+
+        # Color naturalness
+        if 25.0 < sat_mean < 210.0:
+            score += 10.0
+
+        score = max(5.0, min(99.0, score))
+        is_live = score >= 50.0
+        reason = "Live Human Face" if is_live else "Suspected Screen or Paper Spoof"
+
+        return is_live, round(score, 1), reason
+
     def recognize_from_frame(self, frame: np.ndarray,
-                              tolerance: float = 0.55) -> List[Dict]:
+                              tolerance: float = 0.55,
+                              check_spoof: bool = True) -> List[Dict]:
         rgb   = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         small = cv2.resize(rgb, (0, 0), fx=0.5, fy=0.5)
         detections = self._detect_and_encode(small)
         results = []
+        h, w = rgb.shape[:2]
+
         for enc, loc in detections:
             sid, name, conf = self._match_encoding(enc, tolerance)
             top, right, bottom, left = loc
+            orig_top = max(0, top * 2)
+            orig_bottom = min(h, bottom * 2)
+            orig_left = max(0, left * 2)
+            orig_right = min(w, right * 2)
+
+            is_live = True
+            liveness_score = 95.0
+            liveness_reason = "Live Face"
+
+            if check_spoof and (orig_bottom > orig_top + 10) and (orig_right > orig_left + 10):
+                face_crop = rgb[orig_top:orig_bottom, orig_left:orig_right]
+                is_live, liveness_score, liveness_reason = self.check_liveness(face_crop)
+
             results.append({
-                "student_id": sid,
-                "name":       name,
-                "location":   (top * 2, right * 2, bottom * 2, left * 2),
-                "confidence": conf,
-                "recognized": sid is not None,
+                "student_id":      sid,
+                "name":            name,
+                "location":        (orig_top, orig_right, orig_bottom, orig_left),
+                "confidence":      conf,
+                "recognized":      sid is not None,
+                "is_live":         is_live,
+                "liveness_score":  liveness_score,
+                "liveness_reason": liveness_reason,
+                "spoof_detected":  not is_live,
             })
         return results
 

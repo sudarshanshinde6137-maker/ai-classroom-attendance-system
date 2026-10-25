@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: ai-attendance-studio
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /api/meta

@@ -85,7 +85,7 @@ class WebcamWindow:
                 print("Mediapipe solutions not available, disabling 3D HUD mesh.")
 
         self.win = ctk.CTkToplevel(parent)
-        self.win.title("AI HUD - Real-Time Dashboard")
+        self.win.title("J.A.R.V.I.S. Biometric Face Scanner • Mediapipe HUD")
         self.win.geometry("1040x680")
         self.win.configure(fg_color=APP_BG)
         self.win.protocol("WM_DELETE_WINDOW", self.stop)
@@ -95,6 +95,7 @@ class WebcamWindow:
 
         self._build_ui()
         self.start()
+        self._speak_async("J.A.R.V.I.S. optical biometric scanner online.")
 
     def _speak_async(self, text):
         if not TTS_AVAILABLE:
@@ -318,7 +319,7 @@ class WebcamWindow:
                                     _dashboard_refresh_needed = True
                                     # Trigger effects
                                     self._play_chime()
-                                    self._speak_async(f"Attendance marked for {name}")
+                                    self._speak_async(f"J.A.R.V.I.S. verified: {name}. Attendance logged.")
 
                         # Immediately refresh the parent dashboard whenever a new mark is made
                         if _dashboard_refresh_needed and self.on_close:
@@ -430,3 +431,4 @@ class WebcamWindow:
             pass
         if self.on_close:
             self.on_close()
+            

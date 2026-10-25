@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Classroom Attendance System • Fast Studio</title>
+  <title>VisionAttend • AI Facial Recognition Attendance Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="dark-theme">
 
-  <!-- Ambient background glow elements -->
+  <!-- Ambient background cyber elements & glowing light blooms -->
+  <div class="cyber-grid-overlay"></div>
   <div class="glow-orb orb-1"></div>
   <div class="glow-orb orb-2"></div>
   <div class="glow-orb orb-3"></div>
+  <div class="glow-orb orb-4"></div>
 
   <div id="app" class="app-layout">
     
@@ -22,19 +24,22 @@
     <header class="top-nav">
       <div class="brand">
         <div class="brand-icon">
+          <div class="brand-icon-pulse"></div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a5 5 0 0 1 5 5v3a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z"></path>
-            <path d="M19 11v1a7 7 0 0 1-14 0v-1"></path>
-            <path d="M12 19v3"></path>
-            <line x1="8" y1="22" x2="16" y2="22"></line>
+            <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+            <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+            <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+            <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+            <circle cx="12" cy="11" r="3.2"></circle>
+            <path d="M9.5 16.5c.8.6 1.6.7 2.5.7s1.7-.1 2.5-.7"></path>
           </svg>
         </div>
-        <div>
+        <div class="brand-meta">
           <div class="brand-title">
-            <span>VISION</span>ATTEND
-            <span class="badge-fast">FAST ENGINE</span>
+            <span class="brand-vision">VISION</span><span class="brand-attend">ATTEND</span>
+            <span class="badge-fast"><span class="badge-dot"></span>NEURAL AI 2.0</span>
           </div>
-          <div class="brand-sub">AI Classroom Facial Recognition System</div>
+          <div class="brand-sub">Real-Time Biometric Classroom Attendance Studio</div>
         </div>
       </div>
 
@@ -60,11 +65,27 @@
 
       <!-- Live Clock & Status -->
       <div class="header-right">
+        <button id="btn-projection-mode" class="btn btn-ghost projection-head-btn" title="Launch Lecture Hall Projection HUD (Smartboard Full-Screen Mode)">
+          <span class="proj-icon">📺</span>
+          <span>Projection HUD</span>
+        </button>
+        <button id="btn-jarvis-global" class="btn btn-ghost jarvis-head-btn" title="J.A.R.V.I.S. Biometric Voice Assistant">
+          <span class="jarvis-mini-reactor"></span>
+          <span>J.A.R.V.I.S. AI</span>
+        </button>
         <div class="system-status">
           <span class="pulse-dot"></span>
           <span id="trained-badge" class="trained-pill">8 Enrolled</span>
         </div>
         <div class="digital-clock" id="clock-display">--:--:--</div>
+        <button id="btn-backup" class="btn btn-ghost" onclick="backupDatabase()" title="Download database backup (.zip)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Backup DB
+        </button>
         <button id="btn-retrain" class="btn btn-ghost" title="Rebuild face encodings from stored photos">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
@@ -101,7 +122,7 @@
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
           </svg>
-          Group Photo Attendance
+          Group Photo
         </button>
         <button class="nav-tab" data-tab="tab-register">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -110,7 +131,7 @@
             <line x1="20" y1="8" x2="20" y2="14"></line>
             <line x1="23" y1="11" x2="17" y2="11"></line>
           </svg>
-          Register Student
+          Register
         </button>
         <button class="nav-tab" data-tab="tab-records">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -120,7 +141,7 @@
             <line x1="16" y1="17" x2="8" y2="17"></line>
             <polyline points="10 9 9 9 8 9"></polyline>
           </svg>
-          Records & Reports
+          Records
         </button>
         <button class="nav-tab" data-tab="tab-students">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -130,11 +151,40 @@
           </svg>
           Directory
         </button>
+        <button class="nav-tab" data-tab="tab-analytics">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          Analytics & Defaulters
+        </button>
+        <button class="nav-tab" data-tab="tab-matrix">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          Monthly Register
+        </button>
+        <button class="nav-tab" data-tab="tab-portal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          Student Portal
+        </button>
       </div>
 
       <!-- Quick Audio Toggle -->
       <div class="audio-toggle-container">
         <button id="btn-sound-toggle" class="btn-sound active" title="Toggle audio chime on face recognition">
+          <span class="sound-wave">
+            <span class="bar bar-1"></span>
+            <span class="bar bar-2"></span>
+            <span class="bar bar-3"></span>
+          </span>
           <span id="sound-icon">🔊</span>
           <span class="sound-label">Audio Chime</span>
         </button>
@@ -223,6 +273,10 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                   <input type="text" id="dash-search" placeholder="Search student or roll..." class="ctrl-input search-box">
                 </div>
+                <button class="btn btn-secondary btn-sm" onclick="openAbsenteeModal()" style="display:flex;align-items:center;gap:6px;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                  Absentee Alerts
+                </button>
                 <button id="btn-dash-refresh" class="btn btn-secondary btn-sm" title="Refresh Table">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                 </button>
@@ -290,6 +344,27 @@
                   <div class="action-text">
                     <strong>Download PDF Report</strong>
                     <span>Formatted A4 printable PDF</span>
+                  </div>
+                </button>
+                <button class="action-btn" onclick="exportDefaulters()">
+                  <div class="action-icon icon-rose" style="background:rgba(239,68,68,0.25);">⚠️</div>
+                  <div class="action-text">
+                    <strong>Export Defaulters (< 75%)</strong>
+                    <span>Official low-attendance report</span>
+                  </div>
+                </button>
+                <button class="action-btn" onclick="exportMonthlyMatrix()">
+                  <div class="action-icon icon-purple">📅</div>
+                  <div class="action-text">
+                    <strong>Monthly Register Matrix</strong>
+                    <span>Full month attendance grid</span>
+                  </div>
+                </button>
+                <button class="action-btn" onclick="openAbsenteeModal()">
+                  <div class="action-icon icon-emerald">📢</div>
+                  <div class="action-text">
+                    <strong>Notify Absentees</strong>
+                    <span>Send parent WhatsApp/SMS alerts</span>
                   </div>
                 </button>
               </div>
@@ -362,16 +437,71 @@
             </div>
           </div>
 
-          <!-- Right: Live Real-time Scan Feed -->
-          <div class="card glass-card live-feed-sidebar">
-            <div class="card-header">
-              <h3>Live Scans Stream</h3>
-              <span class="badge-count" id="session-marked-count">0 Marked</span>
+          <!-- Right: J.A.R.V.I.S. AI Voice Assistant & Live Stream -->
+          <div class="camera-sidebar-stack">
+            <!-- J.A.R.V.I.S. AI Voice Assistant Card -->
+            <div class="card glass-card jarvis-assistant-card">
+              <div class="card-header">
+                <div class="jarvis-brand">
+                  <div class="jarvis-arc-reactor">
+                    <div class="arc-ring ring-outer"></div>
+                    <div class="arc-ring ring-inner"></div>
+                    <div class="arc-core"></div>
+                  </div>
+                  <div>
+                    <h3 class="jarvis-title">J.A.R.V.I.S. <span class="jarvis-badge">AI VOICE HUD</span></h3>
+                    <span class="subtext">Autonomous Biometric Voice Assistant</span>
+                  </div>
+                </div>
+                <div class="jarvis-status-pill active" id="jarvis-status">
+                  <span class="pulse-dot"></span> ONLINE
+                </div>
+              </div>
+
+              <!-- Voice Assistant Telemetry -->
+              <div class="jarvis-telemetry-body">
+                <div class="jarvis-speech-bubble" id="jarvis-transcript">
+                  "Systems online. Ready to scan and verify student identities."
+                </div>
+                
+                <!-- Audio Wave Visualizer Bars -->
+                <div class="jarvis-audio-spectrum" id="jarvis-spectrum">
+                  <div class="spec-bar s1"></div>
+                  <div class="spec-bar s2"></div>
+                  <div class="spec-bar s3"></div>
+                  <div class="spec-bar s4"></div>
+                  <div class="spec-bar s5"></div>
+                  <div class="spec-bar s6"></div>
+                  <div class="spec-bar s7"></div>
+                  <div class="spec-bar s8"></div>
+                </div>
+
+                <!-- Quick JARVIS Interactive Controls -->
+                <div class="jarvis-actions-row">
+                  <button id="btn-jarvis-speak-test" class="btn btn-sm btn-secondary" title="Test J.A.R.V.I.S. voice synthesis">
+                    🎙️ Test Voice
+                  </button>
+                  <button id="btn-jarvis-announce-summary" class="btn btn-sm btn-accent" title="Announce attendance summary">
+                    📢 Briefing
+                  </button>
+                  <button id="btn-jarvis-toggle-voice" class="btn btn-sm btn-primary" title="Toggle J.A.R.V.I.S. automated announcements">
+                    🔊 Voice: ON
+                  </button>
+                </div>
+              </div>
             </div>
-            <div id="live-scans-log" class="scans-log-list">
-              <div class="empty-log-hint">
-                <div class="hint-icon">🎯</div>
-                <p>Recognized students will appear here in real-time with confidence scores.</p>
+
+            <!-- Live Real-time Scan Feed -->
+            <div class="card glass-card live-feed-sidebar">
+              <div class="card-header">
+                <h3>Live Scans Stream</h3>
+                <span class="badge-count" id="session-marked-count">0 Marked</span>
+              </div>
+              <div id="live-scans-log" class="scans-log-list">
+                <div class="empty-log-hint">
+                  <div class="hint-icon">🎯</div>
+                  <p>Recognized students will appear here in real-time with confidence scores.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -596,6 +726,12 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 Export CSV
               </button>
+              <button class="btn btn-export" style="background:#dc2626;" onclick="exportDefaulters()">
+                ⚠️ Defaulters (< 75%)
+              </button>
+              <button class="btn btn-export" style="background:#4f46e5;" onclick="exportMonthlyMatrix()">
+                📅 Monthly Matrix
+              </button>
             </div>
           </div>
 
@@ -662,6 +798,12 @@
           </div>
           <div class="dir-actions">
             <input type="text" id="dir-search" placeholder="Filter roster..." class="ctrl-input dir-search-box">
+            <button class="btn btn-secondary" onclick="openBulkImportModal()">
+              📥 Bulk Import Roster
+            </button>
+            <button class="btn btn-ghost" onclick="downloadSampleTemplate()" title="Download sample CSV template">
+              📄 Sample CSV
+            </button>
             <button class="btn btn-primary" onclick="switchTab('tab-register')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               Enroll New Student
@@ -674,14 +816,689 @@
         </div>
       </section>
 
+      <!-- ======================================================== -->
+      <!-- TAB 7: ACADEMIC ANALYTICS & DEFAULTERS -->
+      <!-- ======================================================== -->
+      <section id="tab-analytics" class="tab-pane">
+        <!-- Analytics KPI Row -->
+        <div class="stats-grid">
+          <div class="stat-card card-absent">
+            <div class="stat-icon-wrapper absent-glow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <div class="stat-meta">
+              <div class="stat-label">Total Defaulters</div>
+              <div class="stat-value" id="analytic-defaulter-count">0</div>
+            </div>
+            <div class="stat-badge absent-badge">&lt; <span id="analytic-def-thresh">75</span>% Attendance</div>
+          </div>
+
+          <div class="stat-card card-total">
+            <div class="stat-icon-wrapper total-glow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+              </svg>
+            </div>
+            <div class="stat-meta">
+              <div class="stat-label">Total Evaluated</div>
+              <div class="stat-value" id="analytic-total-students">0</div>
+            </div>
+            <div class="stat-badge total-badge">All Students</div>
+          </div>
+
+          <div class="stat-card card-present">
+            <div class="stat-icon-wrapper present-glow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </div>
+            <div class="stat-meta">
+              <div class="stat-label">Eligible Students</div>
+              <div class="stat-value" id="analytic-eligible-count">0</div>
+            </div>
+            <div class="stat-badge present-badge">&ge; 75% Safe</div>
+          </div>
+
+          <div class="stat-card card-rate">
+            <div class="stat-icon-wrapper rate-glow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+            <div class="stat-meta">
+              <div class="stat-label">Total Sessions Held</div>
+              <div class="stat-value" id="analytic-sessions-held">0</div>
+            </div>
+            <div class="stat-badge total-badge">Curriculum Slots</div>
+          </div>
+        </div>
+
+        <!-- Defaulters Filter & Table Card -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h3>Defaulters Notice & Academic Interventions</h3>
+              <span class="subtext">Identify students falling below statutory attendance thresholds and trigger immediate notices</span>
+            </div>
+            <div class="export-btn-group">
+              <button class="btn btn-export btn-excel" onclick="exportDefaulters('excel')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="17"></line><line x1="16" y1="13" x2="8" y2="17"></line></svg>
+                Export Notice (Excel)
+              </button>
+              <button class="btn btn-export btn-pdf" onclick="exportDefaulters('pdf')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                Export Notice (PDF)
+              </button>
+            </div>
+          </div>
+
+          <!-- Controls Bar -->
+          <div class="filters-bar">
+            <div class="filter-item">
+              <label>Defaulter Threshold: <strong id="defaulter-thresh-label" style="color:var(--accent-rose);">75%</strong></label>
+              <input type="range" id="defaulter-threshold-slider" min="40" max="90" value="75" class="slider" style="margin-top:6px;">
+            </div>
+            <div class="filter-item">
+              <label>Filter by Subject</label>
+              <select id="defaulter-filter-subject" class="ctrl-select"></select>
+            </div>
+            <div class="filter-item filter-search">
+              <label>Search Defaulter</label>
+              <input type="text" id="defaulter-search-input" placeholder="Search by name, roll, or PRN..." class="ctrl-input">
+            </div>
+            <div class="filter-item filter-btn-wrap">
+              <button id="btn-refresh-defaulters" class="btn btn-secondary">Refresh Analysis</button>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="table-responsive">
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Student</th>
+                  <th>Roll No</th>
+                  <th>PRN</th>
+                  <th>Attended / Total</th>
+                  <th>Attendance %</th>
+                  <th>Risk Status</th>
+                  <th>Parent Contact</th>
+                  <th>Direct Notice</th>
+                </tr>
+              </thead>
+              <tbody id="defaulters-table-body">
+                <tr><td colspan="9" class="loading-cell">Loading academic defaulters...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- TAB 8: MONTHLY REGISTER GRID MATRIX -->
+      <!-- ======================================================== -->
+      <section id="tab-matrix" class="tab-pane">
+        <div class="card glass-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h3>Monthly Attendance Register Matrix</h3>
+              <span class="subtext">Official college-style attendance register with day-by-day P/A status grid</span>
+            </div>
+            <div class="export-btn-group">
+              <button class="btn btn-export btn-excel" onclick="exportMonthlyMatrix()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="17"></line><line x1="16" y1="13" x2="8" y2="17"></line></svg>
+                Export Register Excel (.xlsx)
+              </button>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="filters-bar">
+            <div class="filter-item">
+              <label>Month</label>
+              <select id="matrix-month" class="ctrl-select">
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label>Year</label>
+              <select id="matrix-year" class="ctrl-select">
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+                <option value="2027">2027</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label>Subject</label>
+              <select id="matrix-subject" class="ctrl-select"></select>
+            </div>
+            <div class="filter-item filter-btn-wrap">
+              <button id="btn-load-matrix" class="btn btn-primary">Load Matrix Grid</button>
+            </div>
+          </div>
+
+          <!-- Matrix Table with sticky columns -->
+          <div class="matrix-table-wrapper" id="matrix-wrapper">
+            <div class="loading-cell" id="matrix-loading">Select month and click Load Matrix Grid...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- TAB 9: STUDENT SELF-SERVICE PORTAL -->
+      <!-- ======================================================== -->
+      <section id="tab-portal" class="tab-pane">
+        <div class="portal-container">
+          <!-- Lookup Banner Card -->
+          <div class="card glass-card portal-lookup-card">
+            <div class="portal-header">
+              <div class="portal-badge">STUDENT SELF-SERVICE</div>
+              <h2>Check Your Attendance Report Card</h2>
+              <p>Instant personal verification of attended sessions, subject percentages, and academic eligibility.</p>
+            </div>
+
+            <form id="portal-search-form" class="portal-search-form" onsubmit="event.preventDefault(); lookupStudentPortal();">
+              <div class="portal-input-group">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="portal-query" placeholder="Enter Roll Number or PRN (e.g. 0124UECM1053)..." class="portal-input" required>
+                <button type="submit" class="btn btn-primary btn-portal">Search Attendance</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Result Container -->
+          <div id="portal-result-card" class="portal-result-card hidden">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
-  <!-- Audio elements for sound effects -->
-  <audio id="audio-success" preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbqWE2MDCe3/Pwtm45MDCc2vPwt284MTGZ1vTvunA6MjKW1PLuum87MjKR0/LuvHA8MzGP0vHvvG89MzCO0e/vv3A+MymZ0fDwv3E/MymYz/DwwHFA"></audio>
+  <!-- Absentee Notification Modal -->
+  <div id="absentee-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="card-title-group">
+          <h3>📢 Absentee Parent Alerts</h3>
+          <span class="subtext" id="absentee-modal-sub">Generate and send automated attendance notifications</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="btn btn-secondary btn-sm" onclick="exportAbsenteeCsv()" title="Export CSV dispatch sheet">
+            📥 Export CSV
+          </button>
+          <button class="modal-close-btn" onclick="closeAbsenteeModal()">&times;</button>
+        </div>
+      </div>
+      <div id="absentee-list" class="absentee-list">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Student Profile & Edit Modal -->
+  <div id="student-profile-modal" class="modal-overlay hidden">
+    <div class="modal-card profile-modal-card">
+      <div class="modal-header">
+        <div class="card-title-group">
+          <h3 id="modal-student-name">Student Profile</h3>
+          <span class="subtext" id="modal-student-sub">Attendance overview and details</span>
+        </div>
+        <button class="modal-close-btn" onclick="closeStudentProfileModal()">&times;</button>
+      </div>
+
+      <div class="profile-modal-body">
+        <!-- Top Summary Strip -->
+        <div class="profile-hero-strip">
+          <div class="profile-avatar-wrap">
+            <img id="modal-profile-avatar" src="" alt="Student Avatar" class="profile-avatar-img">
+            <button class="profile-avatar-upload-btn" onclick="document.getElementById('modal-photo-file-input').click()" title="Update Face Photo">📷</button>
+            <input type="file" id="modal-photo-file-input" accept="image/*" class="file-input-hidden">
+          </div>
+          <div class="profile-hero-meta">
+            <h4 id="modal-profile-fullname">--</h4>
+            <div class="profile-badges-row">
+              <span class="code-badge" id="modal-profile-roll">Roll: --</span>
+              <span class="code-badge" id="modal-profile-prn">PRN: --</span>
+              <span class="status-pill status-present" id="modal-profile-status-pill">75% Attendance</span>
+            </div>
+            <div class="profile-contact-row" id="modal-profile-contact">
+              <span>📞 --</span> • <span>✉️ --</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs inside Modal -->
+        <div class="profile-subtabs">
+          <button class="profile-subtab active" data-subtab="profile-tab-overview" onclick="switchProfileSubtab('profile-tab-overview')">Attendance Breakdown</button>
+          <button class="profile-subtab" data-subtab="profile-tab-edit" onclick="switchProfileSubtab('profile-tab-edit')">Edit Student Info</button>
+          <button class="profile-subtab" data-subtab="profile-tab-badge" onclick="switchProfileSubtab('profile-tab-badge')">🪪 Cyber Hologram ID</button>
+        </div>
+
+        <!-- Subtab 1: Attendance Breakdown -->
+        <div id="profile-tab-overview" class="profile-subtab-pane active">
+          <div id="modal-subject-breakdown-grid" class="modal-subj-grid">
+            <!-- Injected via JS -->
+          </div>
+          <h5 style="margin: 16px 0 8px; color: var(--text-secondary); font-size: 13px;">Recent Attendance Sessions</h5>
+          <div class="table-responsive" style="max-height: 200px;">
+            <table class="modern-table modern-table-compact">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Session</th>
+                  <th>Subject</th>
+                  <th>Time</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="modal-recent-logs-body">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Subtab 2: Edit Student Form -->
+        <div id="profile-tab-edit" class="profile-subtab-pane hidden">
+          <form id="edit-student-form" onsubmit="event.preventDefault(); saveStudentProfile();">
+            <input type="hidden" id="edit-student-id">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label>First Name <span class="req">*</span></label>
+                <input type="text" id="edit-first-name" class="form-input" required>
+              </div>
+              <div class="form-group">
+                <label>Last Name (Surname) <span class="req">*</span></label>
+                <input type="text" id="edit-last-name" class="form-input" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Middle Name</label>
+              <input type="text" id="edit-middle-name" class="form-input">
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label>Roll Number <span class="req">*</span></label>
+                <input type="text" id="edit-roll-no" class="form-input" required>
+              </div>
+              <div class="form-group">
+                <label>PRN <span class="req">*</span></label>
+                <input type="text" id="edit-prn" class="form-input" required>
+              </div>
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" id="edit-phone" placeholder="+919876543210" class="form-input">
+              </div>
+              <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="edit-email" placeholder="student@college.edu" class="form-input">
+              </div>
+            </div>
+            <div class="form-submit-row" style="margin-top:14px;display:flex;justify-content:space-between;">
+              <button type="button" class="btn btn-secondary" onclick="deleteStudentFromModal()">Delete Student</button>
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Subtab 3: Cyber Holographic Student ID Pass -->
+        <div id="profile-tab-badge" class="profile-subtab-pane hidden">
+          <div class="cyber-badge-container">
+            <div class="cyber-id-card" id="cyber-id-card">
+              <div class="id-card-sheen"></div>
+              <div class="id-card-header">
+                <div class="id-inst-brand">
+                  <div class="id-chip-icon">⚡</div>
+                  <div>
+                    <div class="id-inst-name">ACADEMIC BIOMETRIC INSTITUTE</div>
+                    <div class="id-inst-sub">AI Biometric Identity Verification Pass</div>
+                  </div>
+                </div>
+                <div class="id-sec-badge">ENCRYPTED</div>
+              </div>
+
+              <div class="id-card-body">
+                <div class="id-photo-frame">
+                  <div class="photo-reticle-corners"></div>
+                  <img id="id-badge-photo" src="" alt="Student Photo" class="id-badge-img">
+                  <div class="id-bio-scan-line"></div>
+                </div>
+                <div class="id-details">
+                  <div class="id-name" id="id-badge-name">STUDENT NAME</div>
+                  <div class="id-row"><span class="k">ROLL NO:</span> <span class="v" id="id-badge-roll">--</span></div>
+                  <div class="id-row"><span class="k">PRN CODE:</span> <span class="v" id="id-badge-prn">--</span></div>
+                  <div class="id-row"><span class="k">STATUS:</span> <span class="v status-active" id="id-badge-status">EXAM ELIGIBLE (85%)</span></div>
+                  <div class="id-row"><span class="k">SECURITY:</span> <span class="v mono" id="id-badge-chip">BIO-8492-X</span></div>
+                </div>
+                <div class="id-qr-box">
+                  <canvas id="id-qr-canvas" width="80" height="80"></canvas>
+                  <span class="qr-sub">SCAN TO VERIFY</span>
+                </div>
+              </div>
+
+              <div class="id-card-footer">
+                <div class="barcode-graphic" id="id-barcode-lines"></div>
+                <div class="id-auth-seal">AUTHENTICATED • FACIAL RECOGNITION 2.0</div>
+              </div>
+            </div>
+
+            <div class="id-actions-bar">
+              <button class="btn btn-secondary btn-sm" onclick="printCyberIdCard()">
+                🖨️ Print ID Card
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="downloadCyberIdCard()">
+                💾 Save Digital Pass
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Import Modal -->
+  <div id="bulk-import-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="card-title-group">
+          <h3>📥 Bulk Student Roster Import</h3>
+          <span class="subtext">Upload CSV or Excel sheet with student names, roll numbers, and contact info</span>
+        </div>
+        <button class="modal-close-btn" onclick="closeBulkImportModal()">&times;</button>
+      </div>
+      <div class="modal-body-padding">
+        <div class="bulk-template-hint">
+          <span>Need the standard spreadsheet format?</span>
+          <button class="btn btn-secondary btn-sm" onclick="downloadSampleTemplate()">
+            📄 Download Sample Template (.csv)
+          </button>
+        </div>
+
+        <div class="upload-dropzone" id="bulk-dropzone" style="margin-top:16px;">
+          <input type="file" id="modal-bulk-file-input" accept=".csv, .xlsx, .xls" class="file-input-hidden">
+          <div class="dropzone-content" onclick="document.getElementById('modal-bulk-file-input').click()">
+            <div class="dropzone-icon">📋</div>
+            <h4>Click or Drag & Drop Roster (.csv, .xlsx)</h4>
+            <p>Columns: first_name, middle_name, last_name, roll_no, prn, phone, email</p>
+          </div>
+        </div>
+
+        <div id="bulk-import-status" class="bulk-import-status hidden" style="margin-top:16px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lecture Hall Projection Mode (Smartboard Full-Screen Presentation HUD) -->
+  <div id="projection-hud-overlay" class="projection-hud-overlay hidden">
+    <div class="proj-top-bar">
+      <div class="proj-brand">
+        <div class="jarvis-arc-reactor mini">
+          <div class="arc-ring ring-outer"></div>
+          <div class="arc-core"></div>
+        </div>
+        <div class="proj-title">LECTURE HALL SMARTBOARD HUD <span class="proj-badge">LIVE BIOMETRIC</span></div>
+      </div>
+      <div class="proj-meta-center">
+        <span class="proj-meta-pill" id="proj-date-pill">--</span>
+        <span class="proj-meta-pill session" id="proj-session-pill">Morning</span>
+        <span class="proj-meta-pill subject" id="proj-subject-pill">Mathematics</span>
+      </div>
+      <div class="proj-actions">
+        <div class="proj-clock" id="proj-clock">--:--:--</div>
+        <button id="btn-close-projection" class="btn btn-sm btn-ghost proj-close-btn" title="Exit Projection Mode (Esc)">
+          ✕ Exit HUD
+        </button>
+      </div>
+    </div>
+
+    <div class="proj-main-grid">
+      <!-- Left: Big Attendance Status Ring & Telemetry -->
+      <div class="proj-stats-panel glass-card">
+        <div class="proj-ring-wrapper">
+          <svg class="proj-progress-ring" viewBox="0 0 160 160">
+            <circle class="ring-bg" cx="80" cy="80" r="68"></circle>
+            <circle class="ring-fill" id="proj-ring-circle" cx="80" cy="80" r="68"></circle>
+          </svg>
+          <div class="proj-ring-center">
+            <div class="proj-ring-pct" id="proj-ring-pct">0%</div>
+            <div class="proj-ring-sub">VERIFIED</div>
+          </div>
+        </div>
+        <div class="proj-metrics-list">
+          <div class="proj-metric-row">
+            <span class="lbl">Total Roster:</span>
+            <span class="val" id="proj-stat-total">0</span>
+          </div>
+          <div class="proj-metric-row">
+            <span class="lbl">Present Today:</span>
+            <span class="val text-success" id="proj-stat-present">0</span>
+          </div>
+          <div class="proj-metric-row">
+            <span class="lbl">Pending Absent:</span>
+            <span class="val text-warning" id="proj-stat-absent">0</span>
+          </div>
+          <div class="proj-metric-row">
+            <span class="lbl">Focus / Vibe Index:</span>
+            <span class="val text-cyan" id="proj-vibe-score">96% ATTENTIVE</span>
+          </div>
+        </div>
+
+        <!-- J.A.R.V.I.S. Audio Activity Bar inside Projection Mode -->
+        <div class="proj-jarvis-hud-bar">
+          <div class="proj-jarvis-status">
+            <span class="pulse-dot"></span>
+            <span>J.A.R.V.I.S. AI CO-PILOT</span>
+          </div>
+          <div class="proj-jarvis-speech" id="proj-jarvis-speech">
+            "Optical scanner active. Entering students will be automatically recognized."
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Massive Live Camera Feed with Holographic Cyber Reticle -->
+      <div class="proj-camera-viewport">
+        <video id="proj-webcam-video" autoplay playsinline muted></video>
+        <canvas id="proj-detection-overlay"></canvas>
+        <div class="proj-reticle-overlay">
+          <div class="proj-reticle-corner tl"></div>
+          <div class="proj-reticle-corner tr"></div>
+          <div class="proj-reticle-corner bl"></div>
+          <div class="proj-reticle-corner br"></div>
+          <div class="proj-laser-sweep"></div>
+          <div class="proj-target-crosshair"></div>
+          <div class="proj-hud-telemetry-text">
+            <span>STREAM: 1080P // LOW-LATENCY OPTICAL AI</span>
+            <span id="proj-fps-text">30 FPS • YUNET-SFACE</span>
+          </div>
+        </div>
+
+        <!-- Real-time Recognition Admission Toast in Center Bottom -->
+        <div id="proj-admission-popup" class="proj-admission-popup hidden">
+          <div class="proj-admission-avatar">
+            <img id="proj-admitted-photo" src="" alt="Student">
+          </div>
+          <div class="proj-admission-info">
+            <div class="badge-present-verified">✓ BIOMETRIC ADMISSION VERIFIED</div>
+            <h2 id="proj-admitted-name">Student Name</h2>
+            <div class="proj-admitted-meta">
+              <span id="proj-admitted-roll">Roll: 00</span> • <span id="proj-admitted-time">10:00:00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Real-time Live Admission Stream List -->
+      <div class="proj-log-panel glass-card">
+        <div class="proj-log-header">
+          <span>RECENT ADMISSIONS</span>
+          <span class="badge-live-count" id="proj-log-count">0 Verified</span>
+        </div>
+        <div class="proj-stream-list" id="proj-stream-list">
+          <div class="proj-empty-stream">
+            <div class="icon">🎯</div>
+            <p>Students stepping into the camera frame will be admitted and logged here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Omnipresent J.A.R.V.I.S. Hologram HUD Orb -->
+  <div id="jarvis-floating-orb" class="jarvis-floating-orb" title="J.A.R.V.I.S. AI Biometric Assistant (Click to Open Console)">
+    <div class="orb-reactor">
+      <div class="orb-ring orb-ring-1"></div>
+      <div class="orb-ring orb-ring-2"></div>
+      <div class="orb-ring orb-ring-3"></div>
+      <div class="orb-core">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="orb-icon">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="22"></line>
+        </svg>
+      </div>
+    </div>
+    <div class="orb-telemetry-badge">
+      <span class="orb-pulse-dot"></span>
+      <span class="orb-status-text" id="orb-status-text">JARVIS READY</span>
+    </div>
+  </div>
+
+  <!-- J.A.R.V.I.S. Neural AI Command Console Modal -->
+  <div id="jarvis-console-modal" class="modal-overlay hidden">
+    <div class="modal-card jarvis-modal-card">
+      <div class="modal-header jarvis-modal-header">
+        <div class="jarvis-brand">
+          <div class="jarvis-arc-reactor large">
+            <div class="arc-ring ring-outer"></div>
+            <div class="arc-ring ring-middle"></div>
+            <div class="arc-ring ring-inner"></div>
+            <div class="arc-core"></div>
+          </div>
+          <div>
+            <h2 class="jarvis-console-title">J.A.R.V.I.S. <span class="jarvis-console-badge">AI COMMAND HUD v3.0</span></h2>
+            <span class="subtext">Autonomous Biometric Voice Command & Attendance Intelligence</span>
+          </div>
+        </div>
+        <div class="jarvis-header-actions">
+          <span class="jarvis-status-pill active" id="jarvis-console-status">
+            <span class="pulse-dot"></span> SYSTEMS NOMINAL
+          </span>
+          <button class="modal-close-btn" id="jarvis-console-close">&times;</button>
+        </div>
+      </div>
+
+      <div class="jarvis-console-body">
+        <!-- Oscilloscope & Arc Reactor Hologram Hero -->
+        <div class="jarvis-hud-hero">
+          <div class="jarvis-reactor-display">
+            <div class="reactor-holosphere">
+              <div class="holosphere-ring r1"></div>
+              <div class="holosphere-ring r2"></div>
+              <div class="holosphere-ring r3"></div>
+              <div class="holosphere-core" id="jarvis-reactor-core">
+                <span class="core-pulse-glow"></span>
+              </div>
+            </div>
+            <div class="reactor-sub-telemetry">
+              <span class="telemetry-item"><span class="k">CORE:</span> <span class="v">YUNET + SFACE</span></span>
+              <span class="telemetry-item"><span class="k">VOICE:</span> <span class="v" id="jarvis-voice-name">SYNTH-HD</span></span>
+              <span class="telemetry-item"><span class="k">STATUS:</span> <span class="v" id="jarvis-mode-label">STANDBY</span></span>
+            </div>
+          </div>
+
+          <!-- Live Waveform Oscilloscope -->
+          <div class="jarvis-oscilloscope-wrapper">
+            <div class="oscilloscope-header">
+              <span class="osc-title">AUDIO WAVEFORM HARMONICS</span>
+              <span class="osc-freq" id="jarvis-freq-display">44.1 kHz • LOW LATENCY</span>
+            </div>
+            <canvas id="jarvis-wave-canvas" class="jarvis-wave-canvas" width="480" height="80"></canvas>
+            <div class="jarvis-speech-preview" id="jarvis-console-speech">
+              "Good day. J.A.R.V.I.S. neural biometric assistant is online and ready for your commands."
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Voice Action Chips -->
+        <div class="jarvis-command-chips">
+          <button class="chip-btn" data-command="briefing">📢 Briefing Report</button>
+          <button class="chip-btn" data-command="who is absent">👥 Who is Absent?</button>
+          <button class="chip-btn" data-command="who is present">✅ Who is Present?</button>
+          <button class="chip-btn" data-command="defaulters">⚠️ Defaulter Audit</button>
+          <button class="chip-btn" data-command="start camera">📸 Deploy Scanner</button>
+          <button class="chip-btn" data-command="open matrix">📊 Monthly Matrix</button>
+          <button class="chip-btn" data-command="projection">📺 Projection Mode</button>
+          <button class="chip-btn" data-command="hands free" id="btn-chip-hands-free">🎙️ Hands-Free: OFF</button>
+          <button class="chip-btn" data-command="toggle voice">🔊 Toggle Voice</button>
+        </div>
+
+        <!-- Interactive Input: Voice Mic & Text Command -->
+        <div class="jarvis-input-container">
+          <button id="btn-jarvis-mic" class="btn-jarvis-mic" title="Click to speak (Voice Recognition)">
+            <div class="mic-pulse-ring"></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mic-icon">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="22"></line>
+            </svg>
+            <span id="jarvis-mic-text">Speak to JARVIS</span>
+          </button>
+          <div class="jarvis-text-input-wrap">
+            <input type="text" id="jarvis-text-cmd" class="jarvis-text-input" placeholder="Ask J.A.R.V.I.S. anything: 'Who is absent today?', 'Start camera', 'Show defaulters'..." />
+            <button id="btn-jarvis-send" class="btn-jarvis-send" title="Send Command">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Telemetry Activity Log / Dialogue History -->
+        <div class="jarvis-dialogue-section">
+          <div class="dialogue-header">
+            <span>JARVIS NEURAL DIALOGUE & TELEMETRY</span>
+            <button class="btn btn-xs btn-ghost" id="btn-clear-jarvis-log">Clear</button>
+          </div>
+          <div class="jarvis-log-stream" id="jarvis-log-stream">
+            <div class="jarvis-log-entry jarvis-msg">
+              <span class="entry-time">--:--:--</span>
+              <span class="entry-sender">J.A.R.V.I.S.:</span>
+              <span class="entry-content">Biometric vision engine active. All systems nominal. Press "Speak to JARVIS" or type any command to interact.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

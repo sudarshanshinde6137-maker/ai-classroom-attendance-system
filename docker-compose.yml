@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  attendance-web:
+    build: .
+    container_name: attendance_studio
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./student_photos:/app/student_photos
+      - ./database:/app/database
+      - ./attendance_records:/app/attendance_records
+      - ./reports:/app/reports
