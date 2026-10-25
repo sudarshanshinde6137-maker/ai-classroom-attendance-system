@@ -222,12 +222,52 @@ async def scan_frame(payload: FrameScanRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Frame decode error: {e}")
 
-    # Recognize faces using FaceEngine
+    # 1. Recognize faces using FaceEngine
     results = engine.recognize_from_frame(frame, tolerance=payload.tolerance)
     
-    recognized_events = []
+    # 2. Scan for Student QR FastPass cards
+    qr_codes = engine.scan_qr_codes(frame)
+    qr_events = []
     today = datetime.now().strftime("%Y-%m-%d")
 
+    for qr in qr_codes:
+        raw = qr["data"]
+        matched_student = None
+        if "PRN:" in raw or "ROLL:" in raw or "STUDENT:" in raw:
+            for part in raw.split("|"):
+                if part.startswith("PRN:"):
+                    matched_student = db.get_student_by_identifier(part.replace("PRN:", "").strip())
+                    if matched_student:
+                        break
+                elif part.startswith("ROLL:") and not matched_student:
+                    matched_student = db.get_student_by_identifier(part.replace("ROLL:", "").strip())
+                    if matched_student:
+                        break
+        else:
+            matched_student = db.get_student_by_identifier(raw)
+
+        if matched_student:
+            ms_id = matched_student["id"]
+            m_now = False
+            a_marked = False
+            success = db.mark_attendance(ms_id, session=payload.session, subject=payload.subject)
+            if success:
+                m_now = True
+            else:
+                a_marked = True
+
+            qr_events.append({
+                "student_id": ms_id,
+                "name": matched_student["name"],
+                "roll_no": matched_student["roll_no"],
+                "prn": matched_student["prn"],
+                "method": "QR FastPass",
+                "marked_now": m_now,
+                "already_marked": a_marked,
+                "points": qr["points"],
+            })
+
+    recognized_events = []
     for r in results:
         sid = r["student_id"]
         conf = r["confidence"]
@@ -244,10 +284,11 @@ async def scan_frame(payload: FrameScanRequest):
         is_live = r.get("is_live", True)
         spoof_detected = r.get("spoof_detected", False)
         liveness_score = r.get("liveness_score", 95.0)
+        attention_info = r.get("attention", {"score": 88.0, "state": "Attentive", "roll_deg": 0.0, "yaw_ratio": 1.0})
 
         if sid and is_live:
             # Check if already present today for this session & subject
-            # Attempt to mark only if live face verified
+            # Mark attendance if live face verified
             success = db.mark_attendance(sid, session=payload.session, subject=payload.subject)
             if success:
                 marked_now = True
@@ -267,13 +308,31 @@ async def scan_frame(payload: FrameScanRequest):
             "marked_now": marked_now,
             "already_marked": already_marked,
             "location": loc,
+            "attention": attention_info,
         })
+
+    # Classroom engagement metrics calculation
+    attention_scores = [r.get("attention", {}).get("score", 88.0) for r in recognized_events]
+    avg_attention = round(float(np.mean(attention_scores)), 1) if attention_scores else 92.0
+    distracted_count = sum(1 for r in recognized_events if r.get("attention", {}).get("state") in ["Distracted", "Drowsy / Inattentive"])
+    attentive_count = len(recognized_events) - distracted_count
+
+    engagement_telemetry = {
+        "index_score": avg_attention,
+        "sentiment": "Engaged" if avg_attention >= 80 else ("Moderate" if avg_attention >= 65 else "Low Attention"),
+        "distracted_count": distracted_count,
+        "attentive_count": attentive_count,
+        "total_faces": len(recognized_events),
+        "qr_count": len(qr_events),
+    }
 
     return {
         "status": "ok",
         "timestamp": datetime.now().strftime("%H:%M:%S"),
         "faces_detected": len(results),
         "results": recognized_events,
+        "qr_events": qr_events,
+        "engagement": engagement_telemetry,
     }
 
 
@@ -436,6 +495,74 @@ async def get_defaulters_api(threshold: float = 75.0, subject: Optional[str] = N
         "defaulters_count": len(defaulters),
         "defaulters": defaulters,
     }
+
+
+@app.get("/api/analytics/predictive-defaulters")
+async def get_predictive_defaulters_api(
+    threshold: float = Query(75.0, description="Defaulter threshold percentage"),
+    semester_slots: int = Query(40, description="Total planned semester lectures"),
+    subject: Optional[str] = Query(None, description="Optional subject filter"),
+):
+    """
+    AI Predictive Attendance Forecaster.
+    Projects end-of-semester attendance based on velocity and safe skip buffer.
+    """
+    forecasts = db.get_predictive_defaulters(
+        threshold=threshold,
+        total_semester_classes=semester_slots,
+        subject=subject
+    )
+    high_risk = sum(1 for f in forecasts if f["risk_level"] == "High Risk Defaulter")
+    moderate_risk = sum(1 for f in forecasts if f["risk_level"] == "Moderate Risk")
+    safe = len(forecasts) - high_risk - moderate_risk
+
+    return {
+        "status": "ok",
+        "threshold": threshold,
+        "total_semester_classes": semester_slots,
+        "subject": subject or "All Subjects",
+        "summary": {
+            "total_students": len(forecasts),
+            "high_risk_defaulters": high_risk,
+            "moderate_risk": moderate_risk,
+            "safe": safe,
+        },
+        "forecasts": forecasts,
+    }
+
+
+GEOFENCE_STATE = {
+    "enabled": False,
+    "latitude": 18.5204,
+    "longitude": 73.8567,
+    "radius_meters": 100.0,
+    "classroom_name": "Lecture Hall 301",
+    "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+}
+
+class GeofenceUpdate(BaseModel):
+    enabled: bool = True
+    latitude: float
+    longitude: float
+    radius_meters: float = 100.0
+    classroom_name: str = "Lecture Hall 301"
+
+@app.get("/api/security/geofence")
+async def get_geofence_status():
+    return GEOFENCE_STATE
+
+@app.post("/api/security/geofence")
+async def update_geofence(req: GeofenceUpdate):
+    global GEOFENCE_STATE
+    GEOFENCE_STATE = {
+        "enabled": req.enabled,
+        "latitude": req.latitude,
+        "longitude": req.longitude,
+        "radius_meters": req.radius_meters,
+        "classroom_name": req.classroom_name,
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    return {"status": "ok", "geofence": GEOFENCE_STATE}
 
 
 @app.get("/api/analytics/monthly-matrix")

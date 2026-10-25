@@ -101,7 +101,7 @@ class FaceEngine:
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     def _detect_and_encode(self, rgb: np.ndarray):
-        """Returns list of (encoding, location=(top,right,bottom,left))."""
+        """Returns list of (encoding, location=(top,right,bottom,left), landmarks)."""
         results = []
         if self._use_dnn:
             h, w = rgb.shape[:2]
@@ -121,7 +121,8 @@ class FaceEngine:
                     aligned = self._recognizer.alignCrop(rgb, face)
                     feat    = self._recognizer.feature(aligned).flatten()
                     loc = (y, x + fw, y + fh, x)
-                    results.append((feat, loc))
+                    landmarks = face[4:14].tolist() if len(face) >= 14 else []
+                    results.append((feat, loc, landmarks))
                 except Exception:
                     continue
         else:
@@ -133,7 +134,7 @@ class FaceEngine:
                 roi = cv2.equalizeHist(roi)
                 encoding = roi.flatten().astype(np.float32) / 255.0
                 loc = (y, x + fw, y + fh, x)
-                results.append((encoding, loc))
+                results.append((encoding, loc, []))
         return results
 
     def _similarity(self, enc1: np.ndarray, enc2: np.ndarray) -> float:
@@ -173,7 +174,7 @@ class FaceEngine:
         detections = self._detect_and_encode(rgb)
         if not detections:
             return False
-        encoding, _ = detections[0]
+        encoding = detections[0][0]
         self._remove_student_encoding(student_id)
         self.known_encodings.append(encoding)
         self.known_ids.append(student_id)
@@ -191,7 +192,7 @@ class FaceEngine:
                 continue
             detections = self._detect_and_encode(rgb)
             if detections:
-                enc, _ = detections[0]
+                enc = detections[0][0]
                 self.known_encodings.append(enc)
                 self.known_ids.append(student_id)
                 self.known_names.append(name)
@@ -229,7 +230,7 @@ class FaceEngine:
         detections = self._detect_and_encode(rgb)
         if not detections:
             return None
-        enc, _ = detections[0]
+        enc = detections[0][0]
         sid, name, conf = self._match_encoding(enc, tolerance)
         if sid is None:
             return None
@@ -249,7 +250,10 @@ class FaceEngine:
 
         detections = self._detect_and_encode(rgb)
         results = []
-        for enc, loc in detections:
+        for item in detections:
+            enc = item[0]
+            loc = item[1]
+            landmarks = item[2] if len(item) > 2 else []
             sid, name, conf = self._match_encoding(enc, tolerance)
             top, right, bottom, left = loc
             if scale != 1.0:
@@ -257,12 +261,14 @@ class FaceEngine:
                 right  = int(right  / scale)
                 bottom = int(bottom / scale)
                 left   = int(left   / scale)
+            attention_info = self.estimate_attention(landmarks)
             results.append({
                 "student_id": sid,
                 "name":       name,
                 "location":   (top, right, bottom, left),
                 "confidence": conf,
                 "recognized": sid is not None,
+                "attention":  attention_info,
             })
         return results
 
@@ -311,6 +317,100 @@ class FaceEngine:
 
         return is_live, round(score, 1), reason
 
+    def estimate_attention(self, landmarks: List[float]) -> Dict:
+        """
+        Estimates student head pose & attention engagement score using 5 facial landmarks.
+        landmarks format: [x_re, y_re, x_le, y_le, x_nt, y_nt, x_rc, y_rc, x_lc, y_lc]
+        """
+        if not landmarks or len(landmarks) < 10:
+            return {"score": 88.0, "state": "Attentive", "roll_deg": 0.0, "yaw_ratio": 1.0}
+        
+        try:
+            x_re, y_re = float(landmarks[0]), float(landmarks[1])
+            x_le, y_le = float(landmarks[2]), float(landmarks[3])
+            x_nt, y_nt = float(landmarks[4]), float(landmarks[5])
+            x_rc, y_rc = float(landmarks[6]), float(landmarks[7])
+            x_lc, y_lc = float(landmarks[8]), float(landmarks[9])
+
+            # Roll (head tilt)
+            dx = x_le - x_re
+            dy = y_le - y_re
+            roll_deg = float(np.degrees(np.arctan2(dy, dx))) if dx != 0 else 0.0
+
+            # Yaw (head turn left vs right)
+            dist_re = float(np.hypot(x_nt - x_re, y_nt - y_re))
+            dist_le = float(np.hypot(x_nt - x_le, y_nt - y_le))
+            yaw_ratio = dist_re / (dist_le + 1e-4)
+
+            # Pitch (looking down vs looking up)
+            eye_y = (y_re + y_le) / 2.0
+            mouth_y = (y_rc + y_lc) / 2.0
+            dist_eye_nose = max(1.0, y_nt - eye_y)
+            dist_nose_mouth = max(1.0, mouth_y - y_nt)
+            pitch_ratio = dist_eye_nose / dist_nose_mouth
+
+            score = 100.0
+
+            if abs(roll_deg) > 15:
+                score -= min(35.0, (abs(roll_deg) - 15) * 1.8)
+
+            if yaw_ratio > 1.65 or yaw_ratio < 0.6:
+                score -= 30.0
+            elif yaw_ratio > 1.3 or yaw_ratio < 0.77:
+                score -= 15.0
+
+            if pitch_ratio > 1.55:
+                score -= 25.0
+
+            score = float(max(15.0, min(99.0, score)))
+
+            if score >= 80:
+                state = "Attentive"
+            elif score >= 65:
+                state = "Neutral"
+            elif score >= 45:
+                state = "Distracted"
+            else:
+                state = "Drowsy / Inattentive"
+
+            return {
+                "score": round(score, 1),
+                "state": state,
+                "roll_deg": round(roll_deg, 1),
+                "yaw_ratio": round(yaw_ratio, 2)
+            }
+        except Exception:
+            return {"score": 88.0, "state": "Attentive", "roll_deg": 0.0, "yaw_ratio": 1.0}
+
+    def scan_qr_codes(self, frame: np.ndarray) -> List[Dict]:
+        """
+        Scans frame for dynamic student QR FastPass codes using OpenCV's QRCodeDetector.
+        """
+        try:
+            if not hasattr(self, "_qr_detector") or self._qr_detector is None:
+                self._qr_detector = cv2.QRCodeDetector()
+            
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if len(frame.shape) == 3 else frame
+            retval, decoded_info, points, _ = self._qr_detector.detectAndDecodeMulti(gray)
+            results = []
+            if retval and decoded_info:
+                for text, pts in zip(decoded_info, points):
+                    if text and text.strip():
+                        results.append({
+                            "data": text.strip(),
+                            "points": pts.astype(int).tolist()
+                        })
+            if not results:
+                data, pts, _ = self._qr_detector.detectAndDecode(gray)
+                if data and data.strip():
+                    results.append({
+                        "data": data.strip(),
+                        "points": pts.astype(int).tolist() if pts is not None else []
+                    })
+            return results
+        except Exception:
+            return []
+
     def recognize_from_frame(self, frame: np.ndarray,
                               tolerance: float = 0.55,
                               check_spoof: bool = True) -> List[Dict]:
@@ -320,7 +420,10 @@ class FaceEngine:
         results = []
         h, w = rgb.shape[:2]
 
-        for enc, loc in detections:
+        for item in detections:
+            enc = item[0]
+            loc = item[1]
+            landmarks = item[2] if len(item) > 2 else []
             sid, name, conf = self._match_encoding(enc, tolerance)
             top, right, bottom, left = loc
             orig_top = max(0, top * 2)
@@ -336,6 +439,8 @@ class FaceEngine:
                 face_crop = rgb[orig_top:orig_bottom, orig_left:orig_right]
                 is_live, liveness_score, liveness_reason = self.check_liveness(face_crop)
 
+            attention_info = self.estimate_attention(landmarks)
+
             results.append({
                 "student_id":      sid,
                 "name":            name,
@@ -346,6 +451,7 @@ class FaceEngine:
                 "liveness_score":  liveness_score,
                 "liveness_reason": liveness_reason,
                 "spoof_detected":  not is_live,
+                "attention":       attention_info,
             })
         return results
 

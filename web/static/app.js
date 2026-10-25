@@ -485,11 +485,17 @@
   /* ==========================================================================
      Live Camera Attendance Scanner
      ========================================================================== */
-  async function startWebcam() {
+  async function startWebcam(deviceId = null) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
-      });
+      if (state.cameraStream) {
+        state.cameraStream.getTracks().forEach(track => track.stop());
+      }
+      const constraints = {
+        video: deviceId 
+          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          : { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       state.cameraStream = stream;
       if (dom.webcamVideo) {
         dom.webcamVideo.srcObject = stream;
@@ -500,11 +506,34 @@
       state.cameraScanning = true;
       resizeOverlayCanvas();
       startAutoScanLoop();
-      showToast('Live camera activated', 'success');
-      jarvisSpeak('J.A.R.V.I.S. Biometric Vision Engine online. Ready to scan.');
+      showToast('Live camera activated (Dual Face & QR Mode)', 'success');
+      populateCameraDevices();
+      jarvisSpeak('Biometric Vision Engine online. Dual-mode face recognition & QR FastPass active.');
     } catch (err) {
       showToast(`Camera error: ${err.message}`, 'error');
     }
+  }
+
+  async function populateCameraDevices() {
+    const sel = document.getElementById('cam-device-select');
+    if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      if (videoDevices.length === 0) return;
+      const currentVal = sel.value;
+      sel.innerHTML = '';
+      videoDevices.forEach((dev, idx) => {
+        const opt = document.createElement('option');
+        opt.value = dev.deviceId;
+        opt.textContent = dev.label || `Camera Lens ${idx + 1}`;
+        if (dev.deviceId === currentVal) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.onchange = () => {
+        startWebcam(sel.value);
+      };
+    } catch (e) {}
   }
 
   function stopWebcam() {
@@ -591,14 +620,54 @@
         dom.scanSpeedText.textContent = `${elapsed}ms • ${data.faces_detected} face(s)`;
       }
 
-      // Draw bounding boxes on canvas
-      drawDetections(data.results || [], snapCanvas.width, snapCanvas.height);
+      // Update Modern Classroom Attention & Engagement Radar HUD
+      if (data.engagement) {
+        const attVal = document.getElementById('radar-attention-val');
+        const sentBadge = document.getElementById('radar-sentiment-badge');
+        const attBar = document.getElementById('radar-attention-bar');
+        const attCount = document.getElementById('radar-attentive-count');
+        const distCount = document.getElementById('radar-distracted-count');
+        const qrCount = document.getElementById('radar-qr-count');
 
-      // Process and log matches
+        const score = data.engagement.average_attention_score || 0;
+        if (attVal) attVal.textContent = `${score}%`;
+        if (sentBadge) {
+          sentBadge.textContent = score >= 80 ? 'Engaged' : (score >= 60 ? 'Attentive' : 'Distracted');
+          sentBadge.style.background = score >= 70 ? 'rgba(16, 185, 129, 0.18)' : 'rgba(239, 68, 68, 0.18)';
+          sentBadge.style.color = score >= 70 ? '#10b981' : '#ef4444';
+        }
+        if (attBar) {
+          attBar.style.width = `${score}%`;
+          attBar.style.background = score >= 70 ? 'linear-gradient(90deg, #10b981, #06b6d4)' : 'linear-gradient(90deg, #f59e0b, #ef4444)';
+        }
+        if (attCount) attCount.textContent = `🟢 ${data.engagement.attentive_faces || 0} Attentive`;
+        if (distCount) distCount.textContent = `⚠️ ${data.engagement.distracted_faces || 0} Distracted`;
+        if (qrCount) qrCount.textContent = `⚡ ${(data.qr_events || []).length} FastPass`;
+      }
+
+      // Draw bounding boxes on canvas (faces + QR fastpasses)
+      drawDetections(data.results || [], snapCanvas.width, snapCanvas.height, data.qr_events || []);
+
+      // Process and log face matches
       if (data.results && data.results.length > 0) {
         data.results.forEach(student => {
           if (student.recognized && student.student_id) {
             handleRecognizedStudent(student);
+          }
+        });
+      }
+
+      // Process and log QR FastPass matches
+      if (data.qr_events && data.qr_events.length > 0) {
+        data.qr_events.forEach(q => {
+          if (q.success && q.student) {
+            handleRecognizedStudent({
+              ...q.student,
+              confidence: 1.0,
+              mode: 'QR FastPass'
+            });
+            playSciFiChime();
+            showToast(`⚡ FastPass Verified: ${q.student.name} (${q.student.roll_no})`, 'success');
           }
         });
       }
@@ -607,157 +676,242 @@
     }
   }
 
-  function drawDetections(results, naturalWidth, naturalHeight) {
+  function drawDetections(results, naturalWidth, naturalHeight, qrEvents = []) {
     if (!dom.detectionOverlay) return;
     const ctx = dom.detectionOverlay.getContext('2d');
     const width = dom.detectionOverlay.width;
     const height = dom.detectionOverlay.height;
     ctx.clearRect(0, 0, width, height);
 
-    if (!results || results.length === 0) return;
-
     const scaleX = width / naturalWidth;
     const scaleY = height / naturalHeight;
 
-    results.forEach(res => {
-      if (!res.location) return;
-      let [top, right, bottom, left] = res.location;
+    // 1. Render Face Detections & Attention Telemetry
+    if (results && results.length > 0) {
+      results.forEach(res => {
+        if (!res.location) return;
+        let [top, right, bottom, left] = res.location;
 
-      // Note: Video is mirrored via CSS scaleX(-1)
-      const boxW = Math.max(20, (right - left) * scaleX);
-      const boxH = Math.max(20, (bottom - top) * scaleY);
-      const boxX = (naturalWidth - right) * scaleX;
-      const boxY = top * scaleY;
+        // Note: Video is mirrored via CSS scaleX(-1)
+        const boxW = Math.max(20, (right - left) * scaleX);
+        const boxH = Math.max(20, (bottom - top) * scaleY);
+        const boxX = (naturalWidth - right) * scaleX;
+        const boxY = top * scaleY;
 
-      const isKnown = res.recognized;
-      let colorPrimary = isKnown ? '#10b981' : '#06b6d4';
-      let colorGlow = isKnown ? 'rgba(16, 185, 129, 0.5)' : 'rgba(6, 182, 212, 0.5)';
-      let labelTitle = isKnown ? res.name : 'Unknown Subject';
-      let labelSub = isKnown ? (res.roll_no ? `Roll: ${res.roll_no}` : 'Verified') : 'No Profile Match';
-      let confText = `${Math.round((res.confidence || 0.95) * 100)}%`;
+        const isKnown = res.recognized;
+        let colorPrimary = isKnown ? '#10b981' : '#06b6d4';
+        let colorGlow = isKnown ? 'rgba(16, 185, 129, 0.5)' : 'rgba(6, 182, 212, 0.5)';
+        let labelTitle = isKnown ? res.name : 'Unknown Subject';
+        let labelSub = isKnown ? (res.roll_no ? `Roll: ${res.roll_no}` : 'Verified') : 'No Profile Match';
+        let confText = `${Math.round((res.confidence || 0.95) * 100)}%`;
 
-      if (res.spoof_detected) {
-        colorPrimary = '#f43f5e';
-        colorGlow = 'rgba(244, 63, 94, 0.6)';
-        labelTitle = 'SPOOF REJECTED';
-        labelSub = 'Photo/Screen Detected';
-        confText = '0%';
-      }
+        if (res.spoof_detected) {
+          colorPrimary = '#f43f5e';
+          colorGlow = 'rgba(244, 63, 94, 0.6)';
+          labelTitle = 'SPOOF REJECTED';
+          labelSub = 'Photo/Screen Detected';
+          confText = '0%';
+        }
 
-      ctx.save();
+        ctx.save();
 
-      // 1. Holographic Box Border with Glow
-      ctx.shadowColor = colorGlow;
-      ctx.shadowBlur = 10;
-      ctx.strokeStyle = colorPrimary;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(boxX, boxY, boxW, boxH);
+        // 1. Holographic Box Border with Glow
+        ctx.shadowColor = colorGlow;
+        ctx.shadowBlur = 10;
+        ctx.strokeStyle = colorPrimary;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(boxX, boxY, boxW, boxH);
 
-      // 2. Corner Target Brackets (Cyber HUD style)
-      const cLen = Math.min(22, boxW * 0.25, boxH * 0.25);
-      ctx.lineWidth = 3.5;
-      ctx.strokeStyle = colorPrimary;
-      ctx.shadowBlur = 14;
+        // 2. Corner Target Brackets (Cyber HUD style)
+        const cLen = Math.min(22, boxW * 0.25, boxH * 0.25);
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = colorPrimary;
+        ctx.shadowBlur = 14;
 
-      // Top-Left
-      ctx.beginPath();
-      ctx.moveTo(boxX, boxY + cLen);
-      ctx.lineTo(boxX, boxY);
-      ctx.lineTo(boxX + cLen, boxY);
-      ctx.stroke();
+        // Top-Left
+        ctx.beginPath();
+        ctx.moveTo(boxX, boxY + cLen);
+        ctx.lineTo(boxX, boxY);
+        ctx.lineTo(boxX + cLen, boxY);
+        ctx.stroke();
 
-      // Top-Right
-      ctx.beginPath();
-      ctx.moveTo(boxX + boxW - cLen, boxY);
-      ctx.lineTo(boxX + boxW, boxY);
-      ctx.lineTo(boxX + boxW, boxY + cLen);
-      ctx.stroke();
+        // Top-Right
+        ctx.beginPath();
+        ctx.moveTo(boxX + boxW - cLen, boxY);
+        ctx.lineTo(boxX + boxW, boxY);
+        ctx.lineTo(boxX + boxW, boxY + cLen);
+        ctx.stroke();
 
-      // Bottom-Left
-      ctx.beginPath();
-      ctx.moveTo(boxX, boxY + boxH - cLen);
-      ctx.lineTo(boxX, boxY + boxH);
-      ctx.lineTo(boxX + cLen, boxY + boxH);
-      ctx.stroke();
+        // Bottom-Left
+        ctx.beginPath();
+        ctx.moveTo(boxX, boxY + boxH - cLen);
+        ctx.lineTo(boxX, boxY + boxH);
+        ctx.lineTo(boxX + cLen, boxY + boxH);
+        ctx.stroke();
 
-      // Bottom-Right
-      ctx.beginPath();
-      ctx.moveTo(boxX + boxW - cLen, boxY + boxH);
-      ctx.lineTo(boxX + boxW, boxY + boxH);
-      ctx.lineTo(boxX + boxW, boxY + boxH - cLen);
-      ctx.stroke();
+        // Bottom-Right
+        ctx.beginPath();
+        ctx.moveTo(boxX + boxW - cLen, boxY + boxH);
+        ctx.lineTo(boxX + boxW, boxY + boxH);
+        ctx.lineTo(boxX + boxW, boxY + boxH - cLen);
+        ctx.stroke();
 
-      // 3. Center Crosshair Reticle
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = colorGlow;
-      const midX = boxX + boxW / 2;
-      const midY = boxY + boxH / 2;
-      ctx.beginPath();
-      ctx.moveTo(midX - 7, midY);
-      ctx.lineTo(midX + 7, midY);
-      ctx.moveTo(midX, midY - 7);
-      ctx.lineTo(midX, midY + 7);
-      ctx.stroke();
+        // 3. Center Crosshair Reticle
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = colorGlow;
+        const midX = boxX + boxW / 2;
+        const midY = boxY + boxH / 2;
+        ctx.beginPath();
+        ctx.moveTo(midX - 7, midY);
+        ctx.lineTo(midX + 7, midY);
+        ctx.moveTo(midX, midY - 7);
+        ctx.lineTo(midX, midY + 7);
+        ctx.stroke();
 
-      // 4. Futuristic HUD Header Capsule
-      ctx.font = 'bold 12px "Outfit", "Plus Jakarta Sans", sans-serif';
-      const titleWidth = ctx.measureText(labelTitle).width;
-      ctx.font = '10px "JetBrains Mono", monospace';
-      const subWidth = ctx.measureText(labelSub).width;
-      const confWidth = ctx.measureText(confText).width;
+        // 4. Futuristic HUD Header Capsule
+        ctx.font = 'bold 12px "Outfit", "Plus Jakarta Sans", sans-serif';
+        const titleWidth = ctx.measureText(labelTitle).width;
+        ctx.font = '10px "JetBrains Mono", monospace';
+        const subWidth = ctx.measureText(labelSub).width;
+        const confWidth = ctx.measureText(confText).width;
 
-      const badgeW = Math.max(titleWidth, subWidth) + confWidth + 34;
-      const badgeH = 34;
-      const badgeX = Math.max(4, Math.min(boxX, width - badgeW - 4));
-      const badgeY = Math.max(badgeH + 4, boxY - 8);
+        const badgeW = Math.max(titleWidth, subWidth) + confWidth + 34;
+        const badgeH = 34;
+        const badgeX = Math.max(4, Math.min(boxX, width - badgeW - 4));
+        const badgeY = Math.max(badgeH + 4, boxY - 8);
 
-      // Glass pill background
-      ctx.shadowColor = 'rgba(0,0,0,0.6)';
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = 'rgba(7, 11, 22, 0.9)';
-      ctx.beginPath();
-      if (ctx.roundRect) {
-        ctx.roundRect(badgeX, badgeY - badgeH, badgeW, badgeH, 6);
-      } else {
-        ctx.rect(badgeX, badgeY - badgeH, badgeW, badgeH);
-      }
-      ctx.fill();
+        // Glass pill background
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = 'rgba(7, 11, 22, 0.9)';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(badgeX, badgeY - badgeH, badgeW, badgeH, 6);
+        } else {
+          ctx.rect(badgeX, badgeY - badgeH, badgeW, badgeH);
+        }
+        ctx.fill();
 
-      // Colored Left Accent Bar
-      ctx.fillStyle = colorPrimary;
-      ctx.fillRect(badgeX, badgeY - badgeH, 4, badgeH);
+        // Colored Left Accent Bar
+        ctx.fillStyle = colorPrimary;
+        ctx.fillRect(badgeX, badgeY - badgeH, 4, badgeH);
 
-      // Text Title
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 12px "Outfit", "Plus Jakarta Sans", sans-serif';
-      ctx.fillText(labelTitle, badgeX + 12, badgeY - 18);
+        // Text Title
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 12px "Outfit", "Plus Jakarta Sans", sans-serif';
+        ctx.fillText(labelTitle, badgeX + 12, badgeY - 18);
 
-      // Text Subtitle (Roll / Status)
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = '10px "JetBrains Mono", monospace';
-      ctx.fillText(labelSub, badgeX + 12, badgeY - 6);
+        // Text Subtitle (Roll / Status)
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '10px "JetBrains Mono", monospace';
+        ctx.fillText(labelSub, badgeX + 12, badgeY - 6);
 
-      // Confidence Pill on Right
-      const pillW = confWidth + 12;
-      const pillX = badgeX + badgeW - pillW - 6;
-      const pillY = badgeY - badgeH + 7;
-      ctx.fillStyle = colorGlow;
-      ctx.beginPath();
-      if (ctx.roundRect) {
-        ctx.roundRect(pillX, pillY, pillW, 20, 10);
-      } else {
-        ctx.rect(pillX, pillY, pillW, 20);
-      }
-      ctx.fill();
+        // Confidence Pill on Right
+        const pillW = confWidth + 12;
+        const pillX = badgeX + badgeW - pillW - 6;
+        const pillY = badgeY - badgeH + 7;
+        ctx.fillStyle = colorGlow;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(pillX, pillY, pillW, 20, 10);
+        } else {
+          ctx.rect(pillX, pillY, pillW, 20);
+        }
+        ctx.fill();
 
-      ctx.fillStyle = colorPrimary;
-      ctx.font = 'bold 10px "JetBrains Mono", monospace';
-      ctx.fillText(confText, pillX + 6, pillY + 14);
+        ctx.fillStyle = colorPrimary;
+        ctx.font = 'bold 10px "JetBrains Mono", monospace';
+        ctx.fillText(confText, pillX + 6, pillY + 14);
 
-      ctx.restore();
-    });
+        // 5. Attention & Engagement Indicator Under Box
+        if (res.attention) {
+          const isAttentive = res.attention.attentive;
+          const attScore = res.attention.score || 85;
+          const attColor = isAttentive ? '#10b981' : '#f59e0b';
+          const attIcon = isAttentive ? '🟢' : '⚠️';
+          const attLabel = `${attIcon} ${res.attention.state || 'Attentive'} (${attScore}%)`;
+
+          ctx.font = 'bold 10px "JetBrains Mono", monospace';
+          const attW = ctx.measureText(attLabel).width + 16;
+          const attH = 18;
+          const attX = boxX + (boxW - attW) / 2;
+          const attY = boxY + boxH + 6;
+
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(attX, attY, attW, attH, 4);
+          } else {
+            ctx.rect(attX, attY, attW, attH);
+          }
+          ctx.fill();
+
+          ctx.strokeStyle = attColor;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.fillStyle = attColor;
+          ctx.fillText(attLabel, attX + 8, attY + 13);
+        }
+
+        ctx.restore();
+      });
+    }
+
+    // 2. Render QR FastPass Overlay
+    if (qrEvents && qrEvents.length > 0) {
+      qrEvents.forEach(q => {
+        if (!q.points || q.points.length === 0) return;
+        ctx.save();
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = 'rgba(0, 240, 255, 0.8)';
+        ctx.shadowBlur = 12;
+
+        // Convert mirrored points
+        const pts = q.points.map(pt => ({
+          x: (naturalWidth - pt[0]) * scaleX,
+          y: pt[1] * scaleY
+        }));
+
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+
+        // Fill subtle translucent cyan
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.12)';
+        ctx.fill();
+
+        // FastPass Badge
+        const minX = Math.min(...pts.map(p => p.x));
+        const minY = Math.min(...pts.map(p => p.y));
+        const qTitle = q.student ? `⚡ FASTPASS: ${q.student.name}` : '⚡ QR CODE DETECTED';
+
+        ctx.font = 'bold 11px "Outfit", sans-serif';
+        const qTitleW = ctx.measureText(qTitle).width + 16;
+        const qBadgeY = Math.max(22, minY - 8);
+
+        ctx.fillStyle = 'rgba(6, 182, 212, 0.92)';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(minX, qBadgeY - 18, qTitleW, 20, 4);
+        } else {
+          ctx.rect(minX, qBadgeY - 18, qTitleW, 20);
+        }
+        ctx.fill();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.fillText(qTitle, minX + 8, qBadgeY - 4);
+
+        ctx.restore();
+      });
+    }
   }
 
   /* ==========================================================================
@@ -2268,6 +2422,183 @@
   }
 
   /* ==========================================================================
+     Modern Classroom GPS Geofencing Security
+     ========================================================================== */
+  window.toggleGeofenceSecurity = async function() {
+    const btn = document.getElementById('btn-geofence-toggle');
+    const txt = document.getElementById('geo-status-text');
+
+    if (!navigator.geolocation) {
+      showToast('Geolocation is not supported by your browser', 'error');
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    if (txt) txt.textContent = 'Calibrating GPS...';
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch('/api/security/geofence', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              enabled: true,
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              radius_meters: 65,
+              room_name: 'Smart Lecture Hall A-101'
+            })
+          });
+          const data = await res.json();
+          if (btn) {
+            btn.classList.add('geo-pinned');
+            btn.disabled = false;
+          }
+          if (txt) txt.textContent = `📍 Geofence Active (±${data.geofence.radius_meters}m)`;
+          showToast(`Classroom GPS Geofence calibrated at [${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}]`, 'success');
+          jarvisSpeak('Classroom GPS perimeter calibrated. Remote proxy attempts will be flagged.');
+        } catch (err) {
+          if (txt) txt.textContent = 'Pin Classroom GPS';
+          if (btn) btn.disabled = false;
+          showToast(`Geofence sync failed: ${err.message}`, 'error');
+        }
+      },
+      (err) => {
+        if (txt) txt.textContent = 'Pin Classroom GPS';
+        if (btn) btn.disabled = false;
+        showToast(`GPS Access Denied: ${err.message}`, 'error');
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  /* ==========================================================================
+     AI Predictive Semester Defaulter Forecaster & Sub-Mode Navigation
+     ========================================================================== */
+  let currentAnalyticsSubMode = 'historical';
+
+  window.switchAnalyticsSubMode = function(mode) {
+    currentAnalyticsSubMode = mode;
+    const btnHist = document.getElementById('btn-mode-historical');
+    const btnPred = document.getElementById('btn-mode-predictive');
+    const wrapHist = document.getElementById('wrap-historical-defaulters');
+    const wrapPred = document.getElementById('wrap-predictive-defaulters');
+    const slotsWrap = document.getElementById('filter-semester-slots-wrap');
+
+    if (mode === 'predictive') {
+      if (btnHist) btnHist.classList.remove('active');
+      if (btnPred) btnPred.classList.add('active');
+      if (wrapHist) wrapHist.classList.add('hidden');
+      if (wrapPred) wrapPred.classList.remove('hidden');
+      if (slotsWrap) slotsWrap.style.display = 'flex';
+      loadPredictiveForecast();
+    } else {
+      if (btnPred) btnPred.classList.remove('active');
+      if (btnHist) btnHist.classList.add('active');
+      if (wrapPred) wrapPred.classList.add('hidden');
+      if (wrapHist) wrapHist.classList.remove('hidden');
+      if (slotsWrap) slotsWrap.style.display = 'none';
+      loadAnalytics();
+    }
+  };
+
+  window.refreshCurrentAnalyticsView = function() {
+    if (currentAnalyticsSubMode === 'predictive') {
+      loadPredictiveForecast();
+    } else {
+      loadAnalytics();
+    }
+  };
+
+  async function loadPredictiveForecast() {
+    const threshSlider = document.getElementById('defaulter-threshold-slider');
+    const threshLabel = document.getElementById('defaulter-thresh-label');
+    const threshVal = threshSlider ? threshSlider.value : 75;
+    if (threshLabel) threshLabel.textContent = `${threshVal}%`;
+
+    const subSelect = document.getElementById('defaulter-filter-subject');
+    const subject = subSelect ? subSelect.value : 'All';
+
+    const slotsInput = document.getElementById('predictive-semester-slots');
+    const totalSlots = slotsInput ? parseInt(slotsInput.value, 10) || 40 : 40;
+
+    const tbody = document.getElementById('predictive-table-body');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="loading-cell">Simulating AI semester velocity and attendance trajectories...</td></tr>';
+
+    try {
+      const url = `/api/analytics/predictive-defaulters?threshold=${threshVal}&total_semester_classes=${totalSlots}&subject=${encodeURIComponent(subject)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to load predictive trajectories');
+      const data = await res.json();
+      renderPredictiveForecastTable(data.forecasts || []);
+    } catch (e) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-error">${e.message}</td></tr>`;
+    }
+  }
+
+  function renderPredictiveForecastTable(forecasts) {
+    const tbody = document.getElementById('predictive-table-body');
+    if (!tbody) return;
+
+    const query = document.getElementById('defaulter-search-input') ? document.getElementById('defaulter-search-input').value.trim().toLowerCase() : '';
+    const filtered = forecasts.filter(f => {
+      if (!query) return true;
+      return (
+        (f.name || '').toLowerCase().includes(query) ||
+        (f.roll_no || '').toLowerCase().includes(query) ||
+        (f.prn || '').toLowerCase().includes(query)
+      );
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>All students on track with stable academic velocity.</p></td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    filtered.forEach((f, idx) => {
+      const tr = document.createElement('tr');
+      let pillClass = 'risk-pill-low';
+      if (f.risk_category === 'HIGH') pillClass = 'risk-pill-high';
+      else if (f.risk_category === 'MODERATE') pillClass = 'risk-pill-mod';
+
+      const projectedColor = f.projected_percentage < 75.0 ? '#ef4444' : '#10b981';
+
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>
+          <div style="font-weight:700;color:var(--text-primary);cursor:pointer;" onclick="openStudentProfile(${f.student_id})">
+            ${f.name}
+          </div>
+        </td>
+        <td><code>${f.roll_no || '--'}</code></td>
+        <td><strong>${f.current_percentage}%</strong> (${f.attended}/${f.total_held})</td>
+        <td>
+          <span style="font-weight:800;color:${projectedColor};font-size:14px;">
+            ${f.projected_percentage}%
+          </span>
+        </td>
+        <td>
+          ${f.safe_skips_remaining > 0 
+            ? `<span style="color:#10b981;font-weight:700;">+${f.safe_skips_remaining} Lectures</span>` 
+            : `<span style="color:#ef4444;font-weight:700;">0 (No margin)</span>`}
+        </td>
+        <td>
+          ${f.consecutive_needed > 0 
+            ? `<span style="color:#f59e0b;font-weight:700;">⚡ ${f.consecutive_needed} in a row</span>` 
+            : `<span style="color:#10b981;font-weight:600;">None required</span>`}
+        </td>
+        <td><span class="${pillClass}">${f.risk_category} RISK</span></td>
+        <td style="font-size:12px;color:var(--text-secondary);max-width:260px;">
+          ${f.recommendation}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  /* ==========================================================================
      Monthly Register Matrix
      ========================================================================== */
   async function loadMonthlyMatrix() {
@@ -3081,15 +3412,17 @@
       defSlider.addEventListener('input', () => {
         const lbl = document.getElementById('defaulter-thresh-label');
         if (lbl) lbl.textContent = `${defSlider.value}%`;
-        loadAnalytics();
+        refreshCurrentAnalyticsView();
       });
     }
     const defSub = document.getElementById('defaulter-filter-subject');
-    if (defSub) defSub.addEventListener('change', loadAnalytics);
+    if (defSub) defSub.addEventListener('change', refreshCurrentAnalyticsView);
     const defSearch = document.getElementById('defaulter-search-input');
-    if (defSearch) defSearch.addEventListener('input', loadAnalytics);
+    if (defSearch) defSearch.addEventListener('input', refreshCurrentAnalyticsView);
     const btnRefDef = document.getElementById('btn-refresh-defaulters');
-    if (btnRefDef) btnRefDef.addEventListener('click', loadAnalytics);
+    if (btnRefDef) btnRefDef.addEventListener('click', refreshCurrentAnalyticsView);
+    const slotsInput = document.getElementById('predictive-semester-slots');
+    if (slotsInput) slotsInput.addEventListener('change', refreshCurrentAnalyticsView);
 
     // Matrix controls
     const btnMatrix = document.getElementById('btn-load-matrix');

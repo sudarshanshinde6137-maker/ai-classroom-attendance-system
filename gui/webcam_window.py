@@ -431,4 +431,4 @@ class WebcamWindow:
             pass
         if self.on_close:
             self.on_close()
-            
+

@@ -855,5 +855,80 @@ class DatabaseManager:
             "rows": matrix_rows
         }
 
+    def get_predictive_defaulters(self, threshold: float = 75.0, total_semester_classes: int = 40, subject: str = None) -> list:
+        """
+        AI Predictive Attendance Forecaster.
+        Projects end-of-semester attendance % based on student attendance velocity,
+        calculates safe skips remaining, and recovery path (consecutive lectures needed).
+        """
+        import math
+        all_stats = self.get_student_attendance_stats(subject=subject)
+        forecasts = []
+
+        for s in all_stats:
+            held = s["total_held"]
+            attended = s["attended"]
+            curr_pct = s["percentage"]
+
+            # If no classes have been held yet, baseline is 100%
+            if held == 0:
+                current_rate = 1.0
+                remaining = total_semester_classes
+            else:
+                current_rate = attended / held
+                remaining = max(0, total_semester_classes - held)
+
+            # Projected end-of-semester attendance
+            projected_attended = min(total_semester_classes, attended + round(remaining * current_rate))
+            proj_pct = round((projected_attended / total_semester_classes * 100), 1) if total_semester_classes > 0 else 0.0
+
+            # Safe skips: how many future classes student can skip while staying >= threshold
+            min_needed_total = math.ceil(total_semester_classes * (threshold / 100.0))
+            future_needed = max(0, min_needed_total - attended)
+            safe_skips = max(0, remaining - future_needed) if remaining >= future_needed else 0
+
+            # Recovery requirement: consecutive lectures needed right now to escape the defaulters list
+            consecutive_needed = 0
+            t_ratio = threshold / 100.0
+            if held > 0 and (attended / held) < t_ratio:
+                if t_ratio < 1.0:
+                    numerator = (t_ratio * held) - attended
+                    denominator = 1.0 - t_ratio
+                    consecutive_needed = max(0, math.ceil(numerator / denominator))
+                else:
+                    consecutive_needed = remaining
+
+            # Categorize risk trajectory
+            if proj_pct >= 80.0 and curr_pct >= threshold:
+                risk = "Low Risk"
+                recommendation = f"Safe buffer: Can afford {safe_skips} excused absence(s)."
+            elif proj_pct >= threshold:
+                risk = "Moderate Risk"
+                recommendation = f"Borderline: Needs to attend at least {future_needed} of remaining {remaining} lectures."
+            else:
+                risk = "High Risk Defaulter"
+                recommendation = f"Critical: Must attend next {consecutive_needed} consecutive lecture(s) immediately."
+
+            forecasts.append({
+                "student_id": s["student_id"],
+                "name": s["name"],
+                "roll_no": s["roll_no"],
+                "prn": s["prn"],
+                "phone": s.get("phone", ""),
+                "email": s.get("email", ""),
+                "classes_held": held,
+                "classes_attended": attended,
+                "current_percentage": curr_pct,
+                "total_semester_classes": total_semester_classes,
+                "remaining_classes": remaining,
+                "projected_percentage": proj_pct,
+                "safe_skips_allowed": safe_skips,
+                "consecutive_needed": consecutive_needed,
+                "risk_level": risk,
+                "ai_recommendation": recommendation
+            })
+
+        return sorted(forecasts, key=lambda x: (x["projected_percentage"], x["current_percentage"]))
+
     def close(self):
         self.conn.close()
