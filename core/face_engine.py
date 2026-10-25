@@ -10,18 +10,23 @@ import numpy as np
 import cv2
 from typing import List, Tuple, Dict, Optional
 
-ENCODINGS_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "database", "encodings.pkl"
-)
-PHOTOS_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "student_photos"
-)
-MODELS_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "database", "models"
-)
+if os.environ.get("VERCEL"):
+    ENCODINGS_PATH = "/tmp/encodings.pkl"
+    PHOTOS_DIR = "/tmp/student_photos"
+    MODELS_DIR = "/tmp/models"
+else:
+    ENCODINGS_PATH = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "database", "encodings.pkl"
+    )
+    PHOTOS_DIR = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "student_photos"
+    )
+    MODELS_DIR = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "database", "models"
+    )
 
 YUNET_URL  = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
 SFACE_URL  = "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"

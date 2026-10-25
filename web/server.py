@@ -41,8 +41,12 @@ from core.reports import (export_excel, export_pdf, export_csv,
                           export_defaulters_report, export_monthly_matrix)
 from core.notifications import generate_absentee_messages, export_absentee_dispatch_csv
 
-PHOTOS_DIR = os.path.join(PROJECT_ROOT, "student_photos")
-REPORTS_DIR = os.path.join(PROJECT_ROOT, "attendance_records")
+if os.environ.get("VERCEL"):
+    PHOTOS_DIR = "/tmp/student_photos"
+    REPORTS_DIR = "/tmp/attendance_records"
+else:
+    PHOTOS_DIR = os.path.join(PROJECT_ROOT, "student_photos")
+    REPORTS_DIR = os.path.join(PROJECT_ROOT, "attendance_records")
 STATIC_DIR = os.path.join(PROJECT_ROOT, "web", "static")
 
 os.makedirs(PHOTOS_DIR, exist_ok=True)

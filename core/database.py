@@ -7,8 +7,18 @@ import os
 import re
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                        "database", "attendance.db")
+if os.environ.get("VERCEL"):
+    import shutil
+    DB_PATH = "/tmp/attendance.db"
+    orig_db = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "database", "attendance.db")
+    if not os.path.exists(DB_PATH) and os.path.exists(orig_db):
+        try:
+            shutil.copy(orig_db, DB_PATH)
+        except Exception:
+            pass
+else:
+    DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                            "database", "attendance.db")
 
 
 def clean_name_part(part: str) -> str:
